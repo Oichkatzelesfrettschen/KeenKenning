@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Synthesis-Dark Palette -->
+    <color name="colorPrimary">#00BCD4</color> <!-- Technical Cyan -->
+    <color name="colorPrimaryDark">#121212</color> <!-- Deep Void -->
+    <color name="colorAccent">#FFC107</color> <!-- Amber Highlight -->
+    
+    <color name="background_deep">#0A0A0A</color>
+    <color name="surface_dark">#1E1E1E</color>
+    <color name="text_primary">#E0E0E0</color>
+    <color name="text_secondary">#B0B0B0</color>
+    <color name="grid_line">#333333</color>
+    
+    <color name="ai_pulse">#00E5FF</color>
+    <color name="error_red">#FF5252</color>
+</resources>

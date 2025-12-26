@@ -1,0 +1,88 @@
+name: Android Release
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Accept Android SDK Licenses
+      run: |
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+    - name: Install NDK
+      run: |
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.2.12479018" || true
+
+    - name: Run Lint (warnings as errors)
+      run: ./gradlew lintDebug
+
+    - name: Run Unit Tests
+      run: ./gradlew testDebugUnitTest
+
+    - name: Verify Native Build
+      run: |
+        echo "Verifying native library compilation..."
+        ./gradlew externalNativeBuildDebug
+        # Check that libraries were built for all ABIs
+        for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+          LIB_PATH="app/build/intermediates/cmake/debug/obj/$abi/libkeen-android-jni.so"
+          if [ -f "$LIB_PATH" ]; then
+            echo "OK: Found $abi library"
+            file "$LIB_PATH"
+          else
+            echo "ERROR: Missing $abi library at $LIB_PATH"
+            exit 1
+          fi
+        done
+
+    - name: Build Debug APKs
+      run: ./gradlew assembleDebug --stacktrace
+
+    - name: Package APKs
+      run: |
+        mkdir -p artifacts
+        
+        # Navigate to APK directory
+        # Adjust path if necessary, but this is standard for 'app' module
+        CDIR="app/build/outputs/apk/debug"
+        
+        if [ -d "$CDIR" ]; then
+          cd "$CDIR"
+          echo "Found APK directory: $CDIR"
+          ls -la
+          
+          for apk in *.apk; do
+            if [ -f "$apk" ]; then
+              echo "Packaging $apk..."
+              # Create a tar.gz for this apk
+              # Naming: keen-android-<original_name>.tar.gz
+              tar -czvf "../../../../../artifacts/${apk}.tar.gz" "$apk"
+            fi
+          done
+        else
+          echo "Error: APK directory not found at $CDIR"
+          exit 1
+        fi
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-debug-builds
+        path: artifacts/*.tar.gz

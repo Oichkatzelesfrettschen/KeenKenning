@@ -1,0 +1,67 @@
+name: Native Sanitizers
+
+on:
+  pull_request:
+    paths:
+      - 'app/src/main/jni/**'
+      - 'app/CMakeLists.txt'
+  workflow_dispatch:
+
+jobs:
+  sanitizer-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        sanitizer: [asan, ubsan]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Accept Android SDK Licenses
+      run: |
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+    - name: Install NDK
+      run: |
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.2.12479018" || true
+
+    - name: Build with Sanitizers
+      env:
+        SANITIZER_TYPE: ${{ matrix.sanitizer }}
+      run: |
+        echo "Building with $SANITIZER_TYPE..."
+
+        # Configure CMake flags for sanitizers
+        if [ "$SANITIZER_TYPE" = "asan" ]; then
+          SANITIZER_FLAGS="-fsanitize=address -fno-omit-frame-pointer"
+        elif [ "$SANITIZER_TYPE" = "ubsan" ]; then
+          SANITIZER_FLAGS="-fsanitize=undefined -fno-sanitize-recover=all"
+        fi
+
+        # Build with sanitizer flags
+        ./gradlew externalNativeBuildDebug \
+          -PcmakeCFlags="$SANITIZER_FLAGS" \
+          -PcmakeCxxFlags="$SANITIZER_FLAGS" \
+          --stacktrace
+
+    - name: Verify Sanitizer Libraries Built
+      run: |
+        echo "Checking sanitizer-enabled libraries..."
+        for abi in arm64-v8a x86_64; do
+          LIB_PATH="app/build/intermediates/cmake/debug/obj/$abi/libkeen-android-jni.so"
+          if [ -f "$LIB_PATH" ]; then
+            echo "OK: Found $abi library"
+            # Check if sanitizer symbols are present
+            nm -C "$LIB_PATH" 2>/dev/null | head -20 || true
+          fi
+        done

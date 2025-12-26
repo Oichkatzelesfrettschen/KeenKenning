@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">KeenKeen</string>
+    <string name="title">KEENKEEN</string>
+    <string name="play">START GAME</string>
+    <string name="mult">Multiplication only</string>
+    <string name="cont">CONTINUE GAME</string>
+
+    <string-array name="size_list">
+        <item>3x3</item>
+        <item>4x4</item>
+        <item>5x5</item>
+        <item>6x6</item>
+        <item>7x7</item>
+        <item>8x8</item>
+        <item>9x9</item>
+    </string-array>
+    <string-array name="diff_list">
+        <item>Easy</item>
+        <item>Normal</item>
+        <item>Hard</item>
+        <item>Extreme</item>
+        <item>Unreasonable</item>
+    </string-array>
+    <string name="enable_ai_gen">Enable AI Gen</string>
+    <string name="classic_mode">Classic Mode</string>
+    <string name="submit_debug_logs">SUBMIT DEBUG LOGS</string>
+</resources>

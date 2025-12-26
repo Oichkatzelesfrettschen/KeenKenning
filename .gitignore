@@ -1,0 +1,59 @@
+# Build artifacts
+/build
+/captures
+*.apk
+*.aab
+
+# IDE and OS
+.DS_Store
+.gradle
+/.idea/caches/
+/.idea/codeStyles/
+/.idea/libraries
+/.idea/tasks.xml
+/.idea/workspace.xml
+*.iml
+.project
+.classpath
+.settings/
+
+# Local configuration
+/local.properties
+
+# AI/ML Artifacts (large binary files)
+scripts/ai/data/
+scripts/ai/.venv/
+*.npz
+*.pth
+*.onnx
+*.onnx.data
+!app/src/main/assets/*.onnx
+!app/src/main/assets/*.onnx.data
+
+# C/C++ Standalone builds
+scripts/ai/latin_gen*
+scripts/ai/host_compat.o
+
+# Tool configs (user-specific)
+.gemini/
+gha-creds-*.json
+
+# Logs and audit files
+logs/*.log
+logs/*.json
+
+# Build/Environment
+.cxx/
+/app/.cxx/
+.venv/
+__pycache__/
+*.pyc
+
+# Database files
+*.db
+
+# Backup/archive directories
+projectFilesBackup/
+
+# Claude Code local settings (user-specific)
+.claude/

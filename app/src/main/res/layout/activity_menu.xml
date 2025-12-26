@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!--<ImageView-->
+        <!--android:layout_width="match_parent"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:src="@drawable/keen_logo"/>-->
+
+    <!-- Temporary, in leiu of the image
+     -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
+        android:text="@string/title"
+        android:textColor="?attr/primaryTextColor"
+        android:textSize="54sp"
+        android:layout_gravity="center"
+        android:layout_margin="16dp"
+        />
+
+
+    <Button
+        android:id="@+id/button_start"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
+        android:textSize="25sp"
+        style="?android:attr/buttonStyle"
+        android:textColor="?attr/primaryTextColor"
+        android:text="@string/play"/>
+
+    <Spinner
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        style="@style/SpinnerAsEditText"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"
+        android:id="@+id/button_size"
+        android:textSize="25sp"
+        android:textColor="?attr/primaryTextColor"
+        android:layout_gravity="center_horizontal" />
+
+
+    <Spinner
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        style="@style/SpinnerAsEditText"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"
+        android:id="@+id/button_diff"
+        android:textSize="25sp"
+        android:textColor="?attr/primaryTextColor"
+        android:layout_gravity="center_horizontal" />
+
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
+        android:textSize="30sp"
+        android:textColor="?attr/primaryTextColor"
+        android:text="@string/mult"
+        android:id="@+id/button_mult"
+        android:layout_gravity="center_horizontal" />
+
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
+        android:textSize="30sp"
+        android:text="@string/enable_ai_gen"
+        android:textColor="@color/ai_pulse"
+        android:id="@+id/button_ai"
+        android:layout_gravity="center_horizontal" />
+
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
+        android:textSize="30sp"
+        android:textColor="?attr/primaryTextColor"
+        android:text="@string/classic_mode"
+        android:id="@+id/button_classic"
+        android:layout_gravity="center_horizontal" />
+
+    <Button
+        android:id="@+id/button_cont"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:layout_marginBottom="5dp"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
+        android:visibility="invisible"
+        android:textSize="25sp"
+        style="?android:attr/buttonStyle"
+        android:textColor="?attr/primaryTextColor"
+        android:text="@string/cont"/>
+
+    <Button
+        android:id="@+id/button_logs"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_gravity="center_horizontal"
+        android:text="@string/submit_debug_logs"
+        android:textSize="14sp"
+        style="?android:attr/borderlessButtonStyle"
+        android:textColor="?attr/primaryTextColor"/>
+
+</LinearLayout>
