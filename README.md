@@ -1,10 +1,10 @@
-# KeenKeen for Android
+# Orthogon for Android
 
 A modern, feature-rich implementation of the KenKen logic puzzle for Android. Built with Jetpack Compose and powered by native C algorithms and optional neural AI assistance.
 
 ## Download
 
-**[Latest Debug Release (v1.3.1)](https://github.com/Oichkatzelesfrettschen/KeenKeenForAndroid/releases/tag/v1.3.1-debug)**
+**[Latest Debug Release (v1.3.1)](https://github.com/Oichkatzelesfrettschen/Orthogon/releases/tag/v1.3.1-debug)**
 
 | APK | Architecture | Size | Notes |
 |-----|--------------|------|-------|
@@ -122,7 +122,7 @@ Output: `app/build/outputs/apk/debug/`
 
 - **Core Algorithms**: [Simon Tatham's Portable Puzzle Collection](https://www.chiark.greenend.org.uk/~sgtatham/puzzles/)
 - **Original Android Port**: Sergey Maltsev
-- **KeenKeen Enhancements**: KeenKeen Contributors
+- **Orthogon Enhancements**: Orthogon Contributors
 
 ## License
 
@@ -130,4 +130,4 @@ GPL-3.0-or-later
 
 ---
 
-*Debug build - Report issues at [GitHub Issues](https://github.com/Oichkatzelesfrettschen/KeenKeenForAndroid/issues)*
+*Debug build - Report issues at [GitHub Issues](https://github.com/Oichkatzelesfrettschen/Orthogon/issues)*

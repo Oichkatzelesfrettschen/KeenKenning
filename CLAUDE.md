@@ -1,14 +1,14 @@
-# KeenKeenForAndroid - Project Memory
+# Orthogon - Project Memory
 
 ## Overview
 
-Android KenKen-style puzzle game combining:
-- **Kotlin/Compose UI** (`app/src/main/java/org/yegie/keenkeenforandroid/ui/`)
-- **Java integration layer** (`KeenModelBuilder.java`, `NeuralKeenGenerator.java`)
-- **C backend** (`app/src/main/jni/keen.c`) via JNI
+Android KenKen puzzle game with mathematical branding. Combines:
+- **Kotlin/Compose UI** (`app/src/main/java/org/yegie/orthogon/ui/`)
+- **Java integration layer** (`KenKenModelBuilder.java`, `NeuralKenKenGenerator.java`)
+- **C backend** (`app/src/main/jni/kenken.c`) via JNI
 - **ONNX neural solver** (`keen_solver_9x9.onnx` supporting 4x4-9x9 grids)
 
-Package: `org.yegie.keenkeenforandroid` (distinct from original "Keen" for side-by-side install)
+Package: `org.yegie.orthogon`
 
 ## Build
 
@@ -28,26 +28,35 @@ Requirements: JDK 21, Android SDK, NDK 27.x
 ## Standards
 
 - **Warnings as errors**: Lint `warningsAsErrors = true` in `app/build.gradle`
-- **Package naming**: JNI functions follow `Java_org_yegie_keenkeenforandroid_<Class>_<Method>`
-- **AI models**: Production model is `keen_solver_9x9.onnx` (not legacy `tiny_keen_solver.onnx`)
+- **Package naming**: JNI functions follow `Java_org_yegie_orthogon_<Class>_<Method>`
+- **Internal naming**: Classes use "KenKen" (the puzzle name), not "Keen"
+- **AI models**: Production model is `keen_solver_9x9.onnx`
 - **Compose**: UI uses Jetpack Compose in `GameScreen.kt`, `GameViewModel.kt`
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `app/src/main/jni/keen.c` | Core puzzle generation (C) |
-| `app/src/main/jni/keen-android-jni.c` | JNI bridge |
-| `NeuralKeenGenerator.java` | ONNX Runtime inference |
-| `KeenModelBuilder.java` | Game state management |
+| `app/src/main/jni/kenken.c` | Core puzzle generation (C) |
+| `app/src/main/jni/kenken-android-jni.c` | JNI bridge |
+| `NeuralKenKenGenerator.java` | ONNX Runtime inference |
+| `KenKenModelBuilder.java` | Game state management |
 | `GameScreen.kt` | Compose UI with quantum visualization |
-| `scripts/ai/train_massive_model.py` | Production model training |
+| `ui/theme/ColorSystem.kt` | CVD-accessible colors, OLED mode |
+| `ui/theme/DesignTokens.kt` | Typography, spacing, battery saver |
+
+## Features
+
+- **OLED Mode**: Pure black backgrounds (#000000) for OLED power savings
+- **Battery Saver**: Three-tier animation scaling (OFF/MODERATE/AGGRESSIVE)
+- **CVD Accessibility**: Five color profiles (Default, Protan, Deutan, Tritan, Mono)
+- **AI Generation**: Optional neural network puzzle generation
 
 ## Common Issues
 
 1. **JDK version mismatch**: Gradle 8.6 requires JDK 21, not 25
-2. **Model name confusion**: Code uses `keen_solver_9x9.onnx`, not legacy `tiny_keen_solver.onnx`
-3. **JNI naming**: Function names must match exact package path with underscores
+2. **JNI naming**: Function names must match exact package path with underscores
+3. **Native library**: Must be named `kenken-android-jni` (matches CMakeLists.txt)
 
 ## References
 

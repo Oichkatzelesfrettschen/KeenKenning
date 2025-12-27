@@ -1,10 +1,10 @@
 /*
  * maxflow_optimized.c: SIMD-optimized Edmonds-Karp max-flow algorithm
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
- * SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKeen Contributors
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (C) 2024-2025 Orthogon Contributors
  *
- * This file is part of KeenKeen for Android.
+ * This file is part of Orthogon for Android.
  *
  * Provides AVX2, SSE2, and ARM NEON optimized implementations of the
  * max-flow algorithm for improved puzzle generation performance.

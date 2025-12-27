@@ -3,7 +3,7 @@
 ## Overview
 
 This document outlines the architecture for implementing additional KenKen game
-modes in KeenKeen for Android.
+modes in Orthogon for Android.
 
 ## Mode Complexity Analysis
 

@@ -5,9 +5,9 @@
  * seeds can be exchanged between versions of a puzzle compiled for
  * different platforms.
  *
- * The generator is based on SHA-1. This is almost certainly
- * overkill, but I had the SHA-1 code kicking around and it was
- * easier to reuse it than to do anything else!
+ * The generator is based on SHA-1. This provides stronger randomness
+ * guarantees than strictly necessary, but SHA-1 is well-tested and
+ * the implementation was readily available for reuse.
  *
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (C) 2004-2024 Simon Tatham

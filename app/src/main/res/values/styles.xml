@@ -6,29 +6,14 @@
         <attr name="backgroundCardColor" format="color"/>
     </declare-styleable>
 
-    <!-- Base application theme. -->
+    <!-- Base application theme using Orthogon Indigo-Magenta palette -->
     <style name="AppTheme.Base.Light" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <!-- Force Dark for Synthesis Aesthetic -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
         <item name="android:windowBackground">@color/background_deep</item>
         <item name="primaryTextColor">@color/text_primary</item>
         <item name="backgroundCardColor">@color/surface_dark</item>
-    </style>
-
-    <!-- Base application theme. -->
-    <style name="AppTheme.Base.Dark" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-        <item name="colorAccent">@color/colorAccent</item>
-        <item name="android:windowBackground">@color/background_deep</item>
-        <item name="primaryTextColor">@color/text_primary</item>
-        <item name="backgroundCardColor">@color/surface_dark</item>
-    </style>
-
-    <style parent="@android:style/Widget.Spinner" name="SpinnerAsEditText">
-        <item name="android:background">@android:drawable/edit_text</item>
     </style>
 
 </resources>

@@ -31,7 +31,7 @@ A "Hard" Keen puzzle is defined by:
 2.  **Cage Interdependence:** Cages where the candidate set depends on the resolution of a neighbor.
 3.  **Arithmetic Ambiguity:** Cages like "Target 12, Multiply" (3x4 vs 2x6) or "Target 1, Subtract" (many pairs).
 
-## 4. Synthesis for KeenKeenForAndroid
+## 4. Synthesis for Orthogon
 
 To maximize the game's potential, we will adopt a **Teacher-Student Architecture**:
 

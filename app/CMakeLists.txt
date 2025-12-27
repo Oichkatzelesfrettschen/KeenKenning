@@ -5,7 +5,7 @@
 
 cmake_minimum_required(VERSION 3.4.1)
 
-project(keen-android-jni)
+project(kenken-android-jni)
 
 # Strict warnings - treat warnings as errors for quality
 # Note: Some warnings from upstream Simon Tatham code are unavoidable:
@@ -26,9 +26,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-function")
 add_library(
             # Sets the name of the library.
             # This has to match the call like:
-            #   System.loadLibrary("keen-android-jni");
+            #   System.loadLibrary("kenken-android-jni");
             #
-            keen-android-jni
+            kenken-android-jni
 
             # Sets the library as a shared library.
             #
@@ -36,9 +36,12 @@ add_library(
 
             # Provides a relative path to your source file(s).
             #
-            src/main/jni/keen-android-jni.c
+            src/main/jni/kenken-android-jni.c
+            src/main/jni/dlx.c
             src/main/jni/dsf.c
-            src/main/jni/keen.c
+            src/main/jni/kenken.c
+            src/main/jni/kenken_hints.c
+            src/main/jni/kenken_validate.c
             src/main/jni/latin.c
             src/main/jni/malloc.c
             src/main/jni/maxflow_optimized.c
@@ -53,5 +56,5 @@ add_library(
 target_link_libraries(
             # Specifies the target library.
             #
-            keen-android-jni
+            kenken-android-jni
 )

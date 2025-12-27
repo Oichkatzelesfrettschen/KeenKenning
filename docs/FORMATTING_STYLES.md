@@ -1,6 +1,6 @@
 # Code Formatting Styles
 
-This document defines the formatting standards for each language in KeenKeenForAndroid.
+This document defines the formatting standards for each language in Orthogon.
 
 ## Java
 
@@ -93,7 +93,7 @@ def example(param: int) -> str:
 <resources>
     <!-- Indentation: 4 spaces -->
     <!-- Attributes: one per line for complex elements -->
-    <string name="app_name">KeenKeen</string>
+    <string name="app_name">Orthogon</string>
 </resources>
 ```
 

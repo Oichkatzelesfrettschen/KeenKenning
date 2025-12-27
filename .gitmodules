@@ -1,0 +1,3 @@
+[submodule "external/latin-square-toolbox"]
+	path = external/latin-square-toolbox
+	url = https://github.com/nathanoschmidt/latin-square-toolbox.git

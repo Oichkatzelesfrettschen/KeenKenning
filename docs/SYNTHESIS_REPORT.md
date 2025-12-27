@@ -1,7 +1,7 @@
 # Synthesis Report: Project Harmonization & AI Integration
 
 ## Executive Summary
-This report details the comprehensive audit, refactoring, and feature integration performed on the `KeenKeenForAndroid` repository. The primary goals were to establish a "Zero Warning" build policy, harmonize the file structure, and fully integrate the Neural AI solver.
+This report details the comprehensive audit, refactoring, and feature integration performed on the `Orthogon` repository. The primary goals were to establish a "Zero Warning" build policy, harmonize the file structure, and fully integrate the Neural AI solver.
 
 ## 1. Build System Harmonization
 - **Java Compatibility**: Detected and resolved a critical incompatibility between Gradle 8.6 and OpenJDK 25 (Preview) by enforcing **OpenJDK 21** via `gradle.properties` and a custom `scripts/build.sh`.

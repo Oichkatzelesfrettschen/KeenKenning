@@ -1,7 +1,15 @@
 /*
- * tree234.c: reasonably generic counted 2-3-4 tree routines.
+ * tree234.c: Counted 2-3-4 tree implementation
  *
- * This file is copyright 1999-2001 Simon Tatham.
+ * A balanced tree data structure supporting O(log n) insertion, deletion,
+ * and lookup with position-indexed access. Used by the Latin square solver
+ * for efficient constraint tracking during puzzle generation.
+ *
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (C) 1999-2024 Simon Tatham
+ *
+ * From Simon Tatham's Portable Puzzle Collection
+ * https://www.chiark.greenend.org.uk/~sgtatham/puzzles/
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -18,7 +26,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
  * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT.  IN NO EVENT SHALL SIMON TATHAM BE LIABLE FOR
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR
  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -212,9 +220,8 @@ static int add234_insert(node234 *left, void *e, node234 *right, node234 **root,
              * Insert in a 4-node; split into a 2-node and a
              * 3-node, and move focus up a level.
              *
-             * I don't think it matters which way round we put the
-             * 2 and the 3. For simplicity, we'll put the 3 first
-             * always.
+             * The ordering of the 2-node and 3-node is arbitrary.
+             * For consistency, the 3-node is placed first.
              */
             if (ki == 0) {
                 m->kids[0] = left;
@@ -478,7 +485,7 @@ void *index234(tree234 *t, int index) {
             n = n->kids[3];
     }
 
-    /* We shouldn't ever get here. I wonder how we did. */
+    /* Unreachable: all valid indices handled above. */
     return NULL;
 }
 

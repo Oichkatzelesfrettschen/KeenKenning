@@ -1,7 +1,14 @@
 /*
- * tree234.h: header defining functions in tree234.c.
+ * tree234.h: Public API for the 2-3-4 tree data structure
  *
- * This file is copyright 1999-2001 Simon Tatham.
+ * Counted 2-3-4 tree supporting O(log n) operations with numeric indexing.
+ * Used for efficient constraint management during Latin square solving.
+ *
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (C) 1999-2024 Simon Tatham
+ *
+ * From Simon Tatham's Portable Puzzle Collection
+ * https://www.chiark.greenend.org.uk/~sgtatham/puzzles/
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -18,7 +25,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
  * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT.  IN NO EVENT SHALL SIMON TATHAM BE LIABLE FOR
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR
  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE

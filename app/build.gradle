@@ -4,12 +4,12 @@ plugins {
 }
 
 android {
-    namespace 'org.yegie.keenkeenforandroid'
+    namespace 'org.yegie.orthogon'
     compileSdk 35
     ndkVersion "27.2.12479018"
 
     defaultConfig {
-        applicationId "org.yegie.keenkeenforandroid"
+        applicationId "org.yegie.orthogon"
         minSdk 22
         targetSdk 35
         versionCode 131

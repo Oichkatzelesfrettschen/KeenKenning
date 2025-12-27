@@ -1,19 +1,18 @@
 /*
- * Edmonds-Karp algorithm for finding a maximum flow and minimum
- * cut in a network. Almost identical to the Ford-Fulkerson
- * algorithm, but apparently using breadth-first search to find the
- * _shortest_ augmenting path is a good way to guarantee
- * termination and ensure the time complexity is not dependent on
- * the actual value of the maximum flow. I don't understand why
- * that should be, but it's claimed on the Internet that it's been
- * proved, and that's good enough for me. I prefer BFS to DFS
- * anyway :-)
+ * maxflow.h: Edmonds-Karp maximum flow algorithm
+ *
+ * Computes maximum flow and minimum cut in directed networks using
+ * breadth-first search for augmenting paths. BFS guarantees O(VE^2)
+ * time complexity independent of flow magnitude.
+ *
+ * Used by the Latin square solver for bipartite matching during
+ * constraint propagation.
  *
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (C) 2004-2024 Simon Tatham
  *
- * From Simon Tatham's Portable Puzzle Collection
- * https://www.chiark.greenend.org.uk/~sgtatham/puzzles/
+ * Based on Simon Tatham's Portable Puzzle Collection
+ * Original source: https://www.chiark.greenend.org.uk/~sgtatham/puzzles/
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation

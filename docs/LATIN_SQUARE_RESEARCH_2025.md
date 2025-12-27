@@ -1,7 +1,7 @@
 # Latin Squares: Mathematical Frontiers, Scientific Applications, and Research Synthesis (2025)
 
 **Date:** December 25, 2025  
-**Prepared for:** KeenKeenForAndroid Research & Development Team  
+**Prepared for:** Orthogon Research & Development Team  
 **Format:** Comprehensive Technical Report  
 
 ---
