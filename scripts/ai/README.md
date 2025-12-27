@@ -6,11 +6,11 @@ This directory contains the Machine Learning training pipeline for Orthogon's La
 
 | Script | Purpose | Output |
 |--------|---------|--------|
-| `generate_data.py` | Generate Latin square training data (CPU) | `data/latin_squares.npz` |
+| `generate_data.py` | Generate Latin square training data (CPU) | `data/latin_squares_massive.npz` |
 | `generate_data_cuda.py` | GPU-accelerated data generation | `data/latin_squares.npz` |
-| `train_massive_model.py` | Basic 9x9 model training | `keen_solver_9x9.onnx` |
+| `train_massive_model.py` | Full 16x16 model training (3-16 grid sizes) | `keen_solver_16x16.onnx` |
 | `train_enhanced.py` | **Enhanced** training with curriculum learning | `keen_solver_enhanced.onnx` |
-| `final_massive_training.py` | Optuna hyperparameter tuning | `keen_solver_9x9.onnx` |
+| `final_massive_training.py` | Optuna hyperparameter tuning | `keen_solver_16x16.onnx` |
 
 ## Quick Start
 
@@ -81,17 +81,17 @@ python train_enhanced.py \
 
 ## Model Architecture
 
-The `EnhancedTransformer` architecture:
+The `RelationalTransformer` architecture (16x16 support):
 
 ```
-Input Grid (9x9) -> Flatten -> Embedding -> Positional Encoding
+Input Grid (16x16) -> Flatten -> Embedding -> Positional Encoding
     -> Pre-LN Transformer Encoder (6 layers)
-    -> Residual Output Head -> Logits (10 classes per cell)
+    -> Residual Output Head -> Logits (17 classes per cell)
 ```
 
-- **Input**: 9x9 grid with 0 for empty, 1-9 for filled cells
-- **Output**: Per-cell probability distribution over 10 classes
-- **Parameters**: ~1.2M (default config)
+- **Input**: 16x16 grid with 0 for empty, 1-16 for filled cells (supports 3x3 to 16x16)
+- **Output**: Per-cell probability distribution over 17 classes
+- **Parameters**: ~2.5M (default config with 256 positions)
 
 ## Integration
 

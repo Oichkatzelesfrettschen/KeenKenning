@@ -180,19 +180,146 @@ def generate_latin_squares_cuda(batch_size=1000, size=9, device="cuda", max_step
     return completed_grids
 
 
+def generate_massive_dataset(output_path="data/latin_squares_massive.npz",
+                             min_size=3, max_size=16,
+                             base_count=5000, device="cuda"):
+    """
+    Generate Latin squares for all sizes from min_size to max_size.
+    Scales down count for larger grids (they take longer to generate).
+    """
+    import numpy as np
+    import os
+
+    os.makedirs("data", exist_ok=True)
+    all_data = {}
+
+    for size in range(min_size, max_size + 1):
+        # Scale count based on size
+        if size <= 9:
+            count = base_count
+        elif size <= 12:
+            count = base_count // 2  # 50% for 10-12
+        else:
+            count = base_count // 4  # 25% for 13-16
+
+        # Increase batch size and steps for larger grids
+        if size <= 6:
+            max_steps = 2000
+        elif size <= 9:
+            max_steps = 5000
+        elif size <= 12:
+            max_steps = 10000
+        else:
+            max_steps = 20000  # More steps for 13-16
+
+        grids = generate_latin_squares_cuda(
+            batch_size=count, size=size, device=device, max_steps=max_steps
+        )
+
+        if grids:
+            all_data[f"size{size}"] = np.array(grids, dtype=np.uint8)
+            print(f"  size{size}: {len(grids)} grids collected")
+        else:
+            print(f"  size{size}: WARNING - no grids generated!")
+
+    np.savez_compressed(output_path, **all_data)
+    print(f"\nSaved dataset to {output_path}")
+    print(f"Total size: {os.path.getsize(output_path)/1024/1024:.2f} MB")
+
+
+def extend_existing_dataset(existing_path="data/latin_squares_massive.npz",
+                            output_path="data/latin_squares_extended.npz",
+                            min_size=10, max_size=16,
+                            base_count=5000, device="cuda"):
+    """
+    Generate additional sizes and merge with existing dataset.
+    """
+    import numpy as np
+    import os
+
+    # Load existing data
+    if os.path.exists(existing_path):
+        existing = dict(np.load(existing_path))
+        print(f"Loaded existing data with {len(existing)} size groups")
+    else:
+        existing = {}
+
+    # Generate new sizes
+    for size in range(min_size, max_size + 1):
+        key = f"size{size}"
+        if key in existing:
+            print(f"  {key}: already exists with {len(existing[key])} grids, skipping")
+            continue
+
+        # Scale count
+        if size <= 9:
+            count = base_count
+        elif size <= 12:
+            count = base_count // 2
+        else:
+            count = base_count // 4
+
+        # More steps for larger sizes
+        max_steps = 5000 if size <= 9 else (10000 if size <= 12 else 20000)
+
+        grids = generate_latin_squares_cuda(
+            batch_size=count, size=size, device=device, max_steps=max_steps
+        )
+
+        if grids:
+            existing[key] = np.array(grids, dtype=np.uint8)
+            print(f"  {key}: {len(grids)} grids generated")
+        else:
+            print(f"  {key}: WARNING - no grids generated!")
+
+    np.savez_compressed(output_path, **existing)
+    print(f"\nSaved extended dataset to {output_path}")
+    print(f"Total size: {os.path.getsize(output_path)/1024/1024:.2f} MB")
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--batch", type=int, default=1000)
-    parser.add_argument("--size", type=int, default=9)
+    import sys
+    import numpy as np
+
+    parser = argparse.ArgumentParser(description="CUDA-accelerated Latin square generator")
+    parser.add_argument("--batch", type=int, default=1000, help="Batch size per generation")
+    parser.add_argument("--size", type=int, default=9, help="Grid size (3-16)")
+    parser.add_argument("--extend", action="store_true",
+                        help="Extend existing dataset with sizes 10-16")
+    parser.add_argument("--full", action="store_true",
+                        help="Generate complete dataset for sizes 3-16")
+    parser.add_argument("--count", type=int, default=5000,
+                        help="Base count per size (scaled down for larger sizes)")
     args = parser.parse_args()
 
-    if args.size > 9:
-        print("Error: Size limited to 9 for this application.")
+    if args.size > 16:
+        print("Error: Size limited to 16 for this model architecture.")
         sys.exit(1)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     if device == "cpu":
         print("Warning: CUDA not found, using CPU tensors (slower).")
 
-    grids = generate_latin_squares_cuda(args.batch, args.size, device)
-    # Save or print logic here
+    if args.extend:
+        # Extend existing dataset with sizes 10-16
+        extend_existing_dataset(
+            existing_path="data/latin_squares_massive.npz",
+            output_path="data/latin_squares_massive.npz",  # Overwrite
+            min_size=10, max_size=16,
+            base_count=args.count, device=device
+        )
+    elif args.full:
+        # Generate complete dataset from scratch
+        generate_massive_dataset(
+            output_path="data/latin_squares_massive.npz",
+            min_size=3, max_size=16,
+            base_count=args.count, device=device
+        )
+    else:
+        # Single size generation
+        grids = generate_latin_squares_cuda(args.batch, args.size, device)
+        if grids:
+            arr = np.array(grids, dtype=np.uint8)
+            output = f"data/latin_squares_{args.size}x{args.size}.npz"
+            np.savez_compressed(output, **{f"size{args.size}": arr})
+            print(f"Saved {len(grids)} grids to {output}")
