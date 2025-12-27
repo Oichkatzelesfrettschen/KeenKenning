@@ -96,15 +96,20 @@ def main():
     else:
         executable = "./latin_gen_opt"
 
-    print(f"--- Massive Data Generation (3x3 to 9x9) ---")
+    print(f"--- Massive Data Generation (3x3 to 16x16) ---")
     print(f"Using executable: {executable}")
 
     os.makedirs("data", exist_ok=True)
     all_data = {}
 
-    for size in range(3, 10):
-        # We generate fewer grids for very large sizes to save time,
-        count = args.count
+    for size in range(3, 17):
+        # Scale down count for larger grids (they take exponentially longer to generate)
+        if size <= 9:
+            count = args.count
+        elif size <= 12:
+            count = args.count // 2  # 50% for 10-12
+        else:
+            count = args.count // 4  # 25% for 13-16
 
         data = generate_parallel(size, count, executable)
         all_data[f"size{size}"] = data

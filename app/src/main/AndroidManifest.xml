@@ -17,6 +17,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
+        android:banner="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:name=".ApplicationCore"
@@ -39,6 +40,10 @@
 
         <activity android:name="org.yegie.orthogon.KenKenActivity"
             android:exported="true"/>
+
+        <activity android:name="org.yegie.orthogon.StoryActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme.Base.Light"/>
     </application>
 
 </manifest>

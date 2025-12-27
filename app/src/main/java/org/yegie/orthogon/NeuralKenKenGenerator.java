@@ -32,9 +32,9 @@ public class NeuralKenKenGenerator {
     public GenResult generate(Context context, int size) {
         Log.i(TAG, "Attempting AI generation for size " + size);
         
-        // 1. Try ONNX (Supports sizes 3-9 in this app, model supports up to 20)
+        // 1. Try ONNX (Supports sizes 3-16 with keen_solver_16x16.onnx)
         GenResult aiResult = null;
-        if (size >= 3 && size <= 9) {
+        if (size >= 3 && size <= 16) {
             try {
                 aiResult = generateFromModel(context, size);
                 if (aiResult != null && isValidLatinSquare(aiResult.grid, size)) {
@@ -68,21 +68,21 @@ public class NeuralKenKenGenerator {
     private GenResult generateFromModel(Context context, int size) throws Exception {
         // Copy model and data to cache dir so ORT can find the .data file
         java.io.File cacheDir = context.getCacheDir();
-        java.io.File modelFile = new java.io.File(cacheDir, "keen_solver_9x9.onnx");
-        java.io.File dataFile = new java.io.File(cacheDir, "keen_solver_9x9.onnx.data"); 
-        
-        copyAsset(context, "keen_solver_9x9.onnx", modelFile);
-        copyAsset(context, "keen_solver_9x9.onnx.data", dataFile);
+        java.io.File modelFile = new java.io.File(cacheDir, "keen_solver_16x16.onnx");
+        java.io.File dataFile = new java.io.File(cacheDir, "keen_solver_16x16.onnx.data");
+
+        copyAsset(context, "keen_solver_16x16.onnx", modelFile);
+        copyAsset(context, "keen_solver_16x16.onnx.data", dataFile);
 
         OrtEnvironment env = OrtEnvironment.getEnvironment();
         OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
         
         // Load from file path
         try (OrtSession session = env.createSession(modelFile.getAbsolutePath(), opts)) {
-            // Model now expects fixed 9x9 input of type INT64
-            int modelSize = 9;
+            // Model expects fixed 16x16 input of type INT64 (supports 3x3 to 16x16)
+            int modelSize = 16;
             long[] inputData = new long[modelSize * modelSize]; // Zero initialized
-            
+
             long[] shape = new long[]{1, modelSize, modelSize}; 
             
             OnnxTensor inputTensor = OnnxTensor.createTensor(env, java.nio.LongBuffer.wrap(inputData), shape);

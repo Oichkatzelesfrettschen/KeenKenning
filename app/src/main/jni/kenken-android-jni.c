@@ -33,6 +33,7 @@
 #include <string.h>
 
 #include "kenken.h"
+#include "kenken_modes.h"
 #include "kenken_validate.h"
 #include "kenken_hints.h"
 #include "jni_error_codes.h"
@@ -75,6 +76,32 @@ JNIEXPORT jstring JNICALL Java_org_yegie_orthogon_KenKenModelBuilder_getLevelFro
 
     if (diff < 0 || diff > 4) {
         char *err = jni_make_error(JNI_ERR_INVALID_PARAMS, "Difficulty must be 0-4");
+        jstring retval = (*env)->NewStringUTF(env, err);
+        sfree(err);
+        return retval;
+    }
+
+    /* Validate mode flags for compatibility */
+    if (!validate_mode_flags(modeFlags)) {
+        char *err = jni_make_error(JNI_ERR_INVALID_MODES,
+            "Incompatible modes: Zero-inclusive cannot combine with Negative");
+        jstring retval = (*env)->NewStringUTF(env, err);
+        sfree(err);
+        return retval;
+    }
+
+    /*
+     * Size limits for special modes:
+     * - Extended modes (Zero/Negative/Modular) reduce valid puzzle space
+     * - For stability, limit these modes to 9x9 max
+     * - Standard mode can attempt up to 16x16 (but may timeout)
+     */
+    if (size > 9 && (HAS_MODE(modeFlags, MODE_ZERO_INCLUSIVE) ||
+                     HAS_MODE(modeFlags, MODE_NEGATIVE) ||
+                     HAS_MODE(modeFlags, MODE_MODULAR) ||
+                     HAS_MODE(modeFlags, MODE_EXPONENT))) {
+        char *err = jni_make_error(JNI_ERR_SIZE_LIMIT,
+            "Extended modes (Zero/Negative/Modular/Powers) limited to 9x9");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
@@ -141,6 +168,27 @@ JNIEXPORT jstring JNICALL Java_org_yegie_orthogon_KenKenModelBuilder_getLevelFro
     /* Validate parameters */
     if (size < 3 || size > 16) {
         char *err = jni_make_error(JNI_ERR_INVALID_PARAMS, "Size must be 3-16");
+        jstring retval = (*env)->NewStringUTF(env, err);
+        sfree(err);
+        return retval;
+    }
+
+    /* Validate mode flags for compatibility */
+    if (!validate_mode_flags(modeFlags)) {
+        char *err = jni_make_error(JNI_ERR_INVALID_MODES,
+            "Incompatible modes: Zero-inclusive cannot combine with Negative");
+        jstring retval = (*env)->NewStringUTF(env, err);
+        sfree(err);
+        return retval;
+    }
+
+    /* Size limits for extended modes */
+    if (size > 9 && (HAS_MODE(modeFlags, MODE_ZERO_INCLUSIVE) ||
+                     HAS_MODE(modeFlags, MODE_NEGATIVE) ||
+                     HAS_MODE(modeFlags, MODE_MODULAR) ||
+                     HAS_MODE(modeFlags, MODE_EXPONENT))) {
+        char *err = jni_make_error(JNI_ERR_SIZE_LIMIT,
+            "Extended modes (Zero/Negative/Modular/Powers) limited to 9x9");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;

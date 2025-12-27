@@ -47,6 +47,8 @@ class KenKenActivity : AppCompatActivity() {
     // Names by which to read from saved prefs
     private val SAVE_MODEL = "save_model"
     private val IS_CONT = "is_continuing"
+    private val SAVE_ELAPSED_TIME = "save_elapsed_time"
+    private val SAVE_GAME_MODE = "save_game_mode"
 
     // Shared prefs file
     private val sharedPref by lazy {
@@ -91,9 +93,10 @@ class KenKenActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
 
-        // If game is already loaded and running, don't reinitialize
+        // If game is already loaded and running, just resume the timer
         if (gameModel != null && viewModel.uiState.value.size > 0) {
-            Log.d("KEEN", "Game already loaded, skipping init")
+            Log.d("KEEN", "Game already loaded, resuming timer")
+            viewModel.resumeTimer()
             return
         }
 
@@ -113,8 +116,18 @@ class KenKenActivity : AppCompatActivity() {
             try {
                 val model = Gson().fromJson(savedModelJson, KenKenModel::class.java)
                 model.ensureInitialized()  // Reinitialize transient fields after deserialization
-                Log.d("KEEN", "Restoring saved game size=${model.size}")
-                runGameModel(model)
+
+                // Restore timer state
+                val savedElapsedTime = sharedPref.getLong(SAVE_ELAPSED_TIME, 0L)
+                val savedModeName = sharedPref.getString(SAVE_GAME_MODE, GameMode.STANDARD.name)
+                val savedGameMode = try {
+                    GameMode.valueOf(savedModeName ?: GameMode.STANDARD.name)
+                } catch (e: IllegalArgumentException) {
+                    GameMode.STANDARD
+                }
+
+                Log.d("KEEN", "Restoring saved game size=${model.size}, timer=$savedElapsedTime, mode=$savedModeName")
+                runGameModel(model, savedElapsedTime, savedGameMode)
                 return
             } catch (e: Exception) {
                 Log.e("KEEN", "Failed to restore saved game: ${e.message}")
@@ -150,15 +163,26 @@ class KenKenActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        // Pause the timer before saving
+        viewModel.pauseTimer()
+
         val editor = sharedPref.edit()
         val currentModel = gameModel
 
         if (currentModel != null) {
             val modelAsString = Gson().toJson(currentModel, KenKenModel::class.java)
             editor.putString(SAVE_MODEL, modelAsString)
+            // Save timer state for this game mode
+            val elapsedTime = viewModel.getElapsedTimeForSave()
+            val currentGameMode = viewModel.getCurrentGameMode()
+            editor.putLong(SAVE_ELAPSED_TIME, elapsedTime)
+            editor.putString(SAVE_GAME_MODE, currentGameMode.name)
             (application as ApplicationCore).setCanCont(!currentModel.puzzleWon)
+            Log.d("KEEN", "onPause: saved timer=$elapsedTime, mode=${currentGameMode.name}")
         } else {
             editor.putString(SAVE_MODEL, "")
+            editor.putLong(SAVE_ELAPSED_TIME, 0L)
+            editor.putString(SAVE_GAME_MODE, GameMode.STANDARD.name)
             (application as ApplicationCore).setCanCont(false)
         }
 
@@ -166,13 +190,29 @@ class KenKenActivity : AppCompatActivity() {
         super.onPause()
     }
 
-    fun runGameModel(gameModel: KenKenModel) {
+    /**
+     * Load and run a game model with optional preserved timer state.
+     *
+     * @param gameModel The game model to load
+     * @param preservedElapsedSeconds If provided, restore timer to this value
+     * @param restoredGameMode The game mode to use (defaults to current gameMode)
+     */
+    fun runGameModel(
+        gameModel: KenKenModel,
+        preservedElapsedSeconds: Long? = null,
+        restoredGameMode: GameMode? = null
+    ) {
         this.gameModel = gameModel
         if (gameModel.wasMlGenerated()) {
              Toast.makeText(this, "ML-Gen Logic: Neural Grid Active", Toast.LENGTH_SHORT).show()
         }
 
-        viewModel.loadModel(gameModel, gameMode = gameMode)
+        val effectiveGameMode = restoredGameMode ?: gameMode
+        viewModel.loadModel(
+            gameModel,
+            gameMode = effectiveGameMode,
+            preservedElapsedSeconds = preservedElapsedSeconds
+        )
         setContent {
             val uiState by viewModel.uiState.collectAsState()
             if (uiState.size > 0) {

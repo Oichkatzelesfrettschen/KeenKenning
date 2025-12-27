@@ -144,10 +144,37 @@ static long lcm_array(digit *arr, int n) {
  * (multiplicative clues with 7+ cells can exceed 32-bit value limits)
  * and create UI challenges (clue text overflow).
  *
- * TODO(large-grids): For 16x16 grids, consider dynamic MAXBLK based on
- *   grid size, or use 64-bit clue values for cages > 6 cells.
+ * MAXBLK_STANDARD: Default for classic KenKen (6 cells max)
+ * MAXBLK_KILLER: Extended for Killer Sudoku mode (16 cells max)
+ *
+ * The clues array uses 'long' (64-bit on most platforms) to handle
+ * products of large cages: e.g., 9^16 = 1.85e15 fits in 64 bits.
  */
-#define MAXBLK 6
+#define MAXBLK_STANDARD 6
+#define MAXBLK_KILLER   16
+#define MAXBLK          MAXBLK_STANDARD  /* Legacy compatibility */
+
+/*
+ * Get effective max block size based on mode flags.
+ * Killer mode allows larger cages to match Killer Sudoku conventions.
+ */
+static inline int get_maxblk(int mode_flags) {
+    if (HAS_MODE(mode_flags, MODE_KILLER)) {
+        return MAXBLK_KILLER;
+    }
+    return MAXBLK_STANDARD;
+}
+
+/*
+ * Get minimum cage size for a mode.
+ * Killer mode typically uses larger minimum cages (2-4 cells).
+ */
+static inline int get_minblk(int mode_flags) {
+    if (HAS_MODE(mode_flags, MODE_KILLER)) {
+        return 2;  /* Killer mode: minimum 2 cells per cage */
+    }
+    return 1;  /* Standard: allow singletons */
+}
 
 enum { COL_BACKGROUND, COL_GRID, COL_USER, COL_HIGHLIGHT, COL_ERROR, COL_PENCIL, NCOLOURS };
 
@@ -1036,6 +1063,8 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
     long *clues, *cluevals;
     int i, j, k, n, x, y, ret;
     int diff = params->diff;
+    int maxblk = get_maxblk(params->mode_flags);
+    (void)get_minblk(params->mode_flags);  /* Reserved for future constraint validation */
     char *desc, *p;
 
     /*
@@ -1065,7 +1094,16 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
     cluevals = snewn(a, long);
     soln = snewn(a, digit);
 
-    while (1) {
+    /*
+     * Limit retries to prevent infinite loops when mode constraints or
+     * large grid sizes make valid puzzles rare. Scale with grid size
+     * since larger grids naturally need more attempts.
+     */
+    int max_retries = 1000 + (a * 10);  /* Base + size-scaled */
+    int attempts = 0;
+
+    while (attempts < max_retries) {
+        attempts++;
         /*
          * First construct a latin square to be the solution.
          */
@@ -1160,19 +1198,19 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                 x = i % w;
                 y = i / w;
 
-                if (x > 0 && dsf_size(dsf, i - 1) < MAXBLK &&
+                if (x > 0 && dsf_size(dsf, i - 1) < maxblk &&
                     (best == -1 || revorder[i - 1] < revorder[best]))
                     best = i - 1;
 
-                if (x + 1 < w && dsf_size(dsf, i + 1) < MAXBLK &&
+                if (x + 1 < w && dsf_size(dsf, i + 1) < maxblk &&
                     (best == -1 || revorder[i + 1] < revorder[best]))
                     best = i + 1;
 
-                if (y > 0 && dsf_size(dsf, i - w) < MAXBLK &&
+                if (y > 0 && dsf_size(dsf, i - w) < maxblk &&
                     (best == -1 || revorder[i - w] < revorder[best]))
                     best = i - w;
 
-                if (y + 1 < w && dsf_size(dsf, i + w) < MAXBLK &&
+                if (y + 1 < w && dsf_size(dsf, i + w) < maxblk &&
                     (best == -1 || revorder[i + w] < revorder[best]))
                     best = i + w;
 
@@ -1542,6 +1580,22 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
     }
 
     /*
+     * Check if we exhausted retries without finding a valid puzzle.
+     * This prevents hangs with problematic mode/size combinations.
+     */
+    if (attempts >= max_retries) {
+        sfree(grid);
+        sfree(order);
+        sfree(revorder);
+        sfree(singletons);
+        sfree(dsf);
+        sfree(clues);
+        sfree(cluevals);
+        sfree(soln);
+        return NULL;
+    }
+
+    /*
      * Encode the puzzle description.
      */
     desc = snewn(40 * a, char);
@@ -1628,6 +1682,8 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
     long *clues, *cluevals;
     int i, j, k, n, x, y, ret;
     int diff = params->diff;
+    int maxblk = get_maxblk(params->mode_flags);
+    (void)get_minblk(params->mode_flags);  /* Reserved for future constraint validation */
     char *desc, *p;
 
     /*
@@ -1734,19 +1790,19 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                 x = i % w;
                 y = i / w;
 
-                if (x > 0 && dsf_size(dsf, i - 1) < MAXBLK &&
+                if (x > 0 && dsf_size(dsf, i - 1) < maxblk &&
                     (best == -1 || revorder[i - 1] < revorder[best]))
                     best = i - 1;
 
-                if (x + 1 < w && dsf_size(dsf, i + 1) < MAXBLK &&
+                if (x + 1 < w && dsf_size(dsf, i + 1) < maxblk &&
                     (best == -1 || revorder[i + 1] < revorder[best]))
                     best = i + 1;
 
-                if (y > 0 && dsf_size(dsf, i - w) < MAXBLK &&
+                if (y > 0 && dsf_size(dsf, i - w) < maxblk &&
                     (best == -1 || revorder[i - w] < revorder[best]))
                     best = i - w;
 
-                if (y + 1 < w && dsf_size(dsf, i + w) < MAXBLK &&
+                if (y + 1 < w && dsf_size(dsf, i + w) < maxblk &&
                     (best == -1 || revorder[i + w] < revorder[best]))
                     best = i + w;
 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -983,6 +984,7 @@ private fun AccessibleCellView(
     onClick: () -> Unit
 ) {
     val dimensions = LocalGameDimensions.current
+    val colors = LocalGameColors.current
 
     // Zone-based background color for visual grouping
     // Uses varied luminance so it works in grayscale too
@@ -1036,7 +1038,7 @@ private fun AccessibleCellView(
         else -> 8.sp
     }
 
-    Box(
+    BoxWithConstraints(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .background(backgroundColor)
@@ -1094,46 +1096,77 @@ private fun AccessibleCellView(
                 contentDescription = buildCellDescription(cell, puzzleSize)
             }
     ) {
+        // Cell dimensions available for proportional calculations
+        val cellHeight = maxHeight
+        val cellWidth = maxWidth
+
+        // Calculate proportional offsets based on actual cell size
+        val valueOffset = cellHeight * dimensions.valueVerticalOffsetRatio
+        val noteGridOffset = cellHeight * dimensions.noteGridOffsetRatio
+        val hintGridOffset = cellHeight * dimensions.hintGridOffsetRatio
+
         // Layout zones to prevent overlap:
         // - TopStart: Clue (cage constraint like "20x")
         // - Center/BottomCenter: Main value or Smart Hints
         // - BottomEnd: User notes (compact)
 
-        // Clue (cage constraint) - positioned top-left with background for visibility
-        if (cell.clue != null) {
-            Text(
-                text = cell.clue,
-                fontSize = clueTextSize,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A),
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .background(Color.White.copy(alpha = 0.7f))
-                    .padding(horizontal = 1.dp)
-            )
-        }
-
-        // Cell value or hints - centered in cell, offset down if clue present
         val hasClue = cell.clue != null
 
+        // Clue (cage constraint) - elevated surface for depth perception
+        // Uses theme colors for dark/light mode compatibility
+        if (cell.clue != null) {
+            Surface(
+                modifier = Modifier.align(Alignment.TopStart),
+                shape = RoundedCornerShape(dimensions.clueBoxCornerRadius),
+                color = colors.surfaceDim,  // Theme-aware surface color
+                shadowElevation = dimensions.clueBoxElevation,
+                tonalElevation = 1.dp
+            ) {
+                Text(
+                    text = cell.clue,
+                    fontSize = clueTextSize,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary,  // Theme-aware text color
+                    modifier = Modifier.padding(
+                        horizontal = dimensions.clueBoxPaddingHorizontal,
+                        vertical = dimensions.clueBoxPaddingVertical
+                    )
+                )
+            }
+        }
+
+        // Cell value - centered with proportional offset if clue present
         if (cell.value != null && cell.value != -1) {
-            // Main value - centered with offset if clue at top-left
-            // For extended grids (10-16), use hex digits (A-G)
             Text(
                 text = valueToDisplay(cell.value),
                 fontSize = valueTextSize,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A),
+                color = colors.textPrimary,  // Theme-aware text color
+                textAlign = TextAlign.Center,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(top = if (hasClue) 6.dp else 0.dp)
+                    .padding(top = if (hasClue) valueOffset else 0.dp)
             )
         } else {
-            // Show Smart Hints or user notes - centered with clue offset
+            // Show Smart Hints or user notes - with proportional offsets
             if (showHints && cell.smartHintProbs != null) {
-                SmartHintsGrid(cell.smartHintProbs, noteTextSize, hasClue = hasClue)
+                SmartHintsGrid(
+                    probs = cell.smartHintProbs,
+                    textSize = noteTextSize,
+                    hasClue = hasClue,
+                    cellWidth = cellWidth,
+                    verticalOffset = hintGridOffset
+                )
             } else if (cell.notes.isNotEmpty() && cell.notes.any { it }) {
-                AccessibleNoteGrid(cell.notes, noteTextSize, puzzleSize, hasClue = hasClue)
+                AccessibleNoteGrid(
+                    notes = cell.notes,
+                    textSize = noteTextSize,
+                    puzzleSize = puzzleSize,
+                    hasClue = hasClue,
+                    cellWidth = cellWidth,
+                    verticalOffset = noteGridOffset,
+                    noteBoxSizeRatio = dimensions.noteBoxSizeRatio
+                )
             }
         }
     }
@@ -1156,42 +1189,68 @@ private fun buildCellDescription(cell: UiCell, puzzleSize: Int = 9): String {
  * Uses both opacity AND font weight to indicate confidence level
  * (provides non-color indication for accessibility)
  * Always centered - only shown when no value is entered
+ *
+ * @param probs List of probabilities for each digit
+ * @param textSize Base text size for hints
+ * @param hasClue Whether this cell has a cage clue (affects positioning)
+ * @param cellWidth Actual cell width for proportional sizing
+ * @param verticalOffset Proportional offset when clue is present
  */
 @Composable
-private fun BoxScope.SmartHintsGrid(
+private fun BoxWithConstraintsScope.SmartHintsGrid(
     probs: List<Float>,
     textSize: androidx.compose.ui.unit.TextUnit,
-    hasClue: Boolean = false
+    hasClue: Boolean = false,
+    cellWidth: Dp = 0.dp,
+    verticalOffset: Dp = 0.dp
 ) {
+    val colors = LocalGameColors.current
     val count = probs.size
     val gridDim = ceil(sqrt(count.toFloat())).toInt().coerceAtLeast(1)
 
     // Smaller text for hints to fit better
     val hintSize = (textSize.value * 0.85f).sp
 
-    // Center position - offset slightly if clue present at top-left
+    // Calculate proportional box size based on cell width
+    val hintBoxSize = if (cellWidth > 0.dp) {
+        (cellWidth / gridDim) * 0.9f  // 90% to leave small gaps
+    } else {
+        8.dp  // Fallback
+    }
+
+    // Center position - use proportional offset when clue present
     Column(
         modifier = Modifier
             .align(Alignment.Center)
-            .padding(top = if (hasClue) 12.dp else 0.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(top = if (hasClue) verticalOffset else 0.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         for (row in 0 until gridDim) {
-            Row(horizontalArrangement = Arrangement.Center) {
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 for (col in 0 until gridDim) {
                     val num = row * gridDim + col + 1
                     if (num <= count) {
                         val p = probs[num - 1]
-                        if (p > 0.1f) {
-                            // Use both opacity AND font weight for probability
-                            // This provides non-color indication of confidence
-                            Text(
-                                text = num.toString(),
-                                fontSize = hintSize,
-                                color = Color(0xFF7B1FA2).copy(alpha = (p * 1.2f).coerceIn(0.3f, 1f)),
-                                fontWeight = if (p > 0.7f) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier.padding(horizontal = 1.dp)
-                            )
+                        // Fixed-size box for consistent grid alignment
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(hintBoxSize)
+                        ) {
+                            if (p > 0.1f) {
+                                // Use both opacity AND font weight for probability
+                                // This provides non-color indication of confidence
+                                Text(
+                                    text = num.toString(),
+                                    fontSize = hintSize,
+                                    color = colors.hintText.copy(alpha = (p * 1.2f).coerceIn(0.3f, 1f)),
+                                    fontWeight = if (p > 0.7f) FontWeight.Bold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
@@ -1201,21 +1260,34 @@ private fun BoxScope.SmartHintsGrid(
 }
 
 /**
- * User notes grid - displays pencil marks in a 3x3 positional grid
- * Each digit (1-9) has a fixed position:
+ * User notes grid - displays pencil marks in a positional grid
+ * For 1-9: 3x3 grid, for 10-16: 4x4 grid
+ * Grid positions:
  *   1 2 3
  *   4 5 6
  *   7 8 9
  * Centered in the cell - only shown when no value is entered
+ *
+ * @param notes Boolean list indicating which notes are set
+ * @param textSize Base text size (used for scaling)
+ * @param puzzleSize Grid size (determines number of digits)
+ * @param hasClue Whether this cell has a cage clue (affects positioning)
+ * @param cellWidth Actual cell width for proportional box sizing
+ * @param verticalOffset Proportional offset when clue is present
+ * @param noteBoxSizeRatio Ratio of cell width for each note box
  */
-@Suppress("UNUSED_PARAMETER")  // textSize kept for API consistency with SmartHintsGrid
 @Composable
-private fun BoxScope.AccessibleNoteGrid(
+private fun BoxWithConstraintsScope.AccessibleNoteGrid(
     notes: List<Boolean>,
     textSize: androidx.compose.ui.unit.TextUnit,
     puzzleSize: Int,
-    hasClue: Boolean = false
+    hasClue: Boolean = false,
+    cellWidth: Dp = 0.dp,
+    verticalOffset: Dp = 0.dp,
+    noteBoxSizeRatio: Float = 0.28f
 ) {
+    val colors = LocalGameColors.current
+
     // Check if any notes are set
     val hasAnyNotes = notes.take(puzzleSize).any { it }
     if (!hasAnyNotes) return
@@ -1228,7 +1300,19 @@ private fun BoxScope.AccessibleNoteGrid(
         else -> 5
     }
 
-    // Smaller text for notes - scales with puzzle size and grid
+    // Calculate proportional box size based on cell width
+    val noteBoxSize = if (cellWidth > 0.dp) {
+        cellWidth * noteBoxSizeRatio
+    } else {
+        // Fallback to fixed sizes if cellWidth not available
+        when {
+            puzzleSize <= 6 -> 10.dp
+            puzzleSize <= 9 -> 8.dp
+            else -> 7.dp
+        }
+    }
+
+    // Smaller text for notes - scales with puzzle size
     val noteSize = when {
         puzzleSize <= 4 -> 10.sp
         puzzleSize <= 6 -> 9.sp
@@ -1236,12 +1320,12 @@ private fun BoxScope.AccessibleNoteGrid(
         else -> 6.sp
     }
 
-    // Display as positional grid - offset down if clue present
+    // Display as positional grid - use proportional offset when clue present
     Column(
         modifier = Modifier
             .align(Alignment.Center)
-            .padding(top = if (hasClue) 10.dp else 0.dp)
-            .background(Color.White.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+            .padding(top = if (hasClue) verticalOffset else 0.dp)
+            .background(colors.surface.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
             .padding(1.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -1255,28 +1339,17 @@ private fun BoxScope.AccessibleNoteGrid(
                     val num = row * gridDim + col + 1  // 1-indexed
                     val noteIndex = num - 1  // 0-indexed for array
 
-                    // Fixed-width box for each position to maintain alignment
+                    // Proportionally-sized box for consistent grid alignment
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(
-                            width = when {
-                                puzzleSize <= 6 -> 10.dp
-                                puzzleSize <= 9 -> 8.dp
-                                else -> 7.dp
-                            },
-                            height = when {
-                                puzzleSize <= 6 -> 10.dp
-                                puzzleSize <= 9 -> 8.dp
-                                else -> 7.dp
-                            }
-                        )
+                        modifier = Modifier.size(noteBoxSize)
                     ) {
                         // Only show digit if it's within puzzle range AND note is set
                         if (num <= puzzleSize && noteIndex < notes.size && notes[noteIndex]) {
                             Text(
                                 text = if (num <= 9) num.toString() else ('A' + (num - 10)).toString(),
                                 fontSize = noteSize,
-                                color = Color(0xFF00695C),  // Dark teal
+                                color = colors.noteText,  // Theme-aware note color
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Center
                             )

@@ -23,7 +23,9 @@ enum class GameMode(
     val iconName: String,
     val cFlags: Int,
     val phase: Int,
-    val implemented: Boolean = false
+    val implemented: Boolean = false,
+    /** Extended tips shown in UI (null = use description only) */
+    val extendedTip: String? = null
 ) {
     // Phase 1: Core Modes (Low Effort)
     STANDARD(
@@ -48,7 +50,10 @@ enum class GameMode(
         iconName = "help_outline",
         cFlags = 0x02,
         phase = 1,
-        implemented = true  // Phase 1: UI-only, hide operation symbols
+        implemented = true,  // Phase 1: UI-only, hide operation symbols
+        extendedTip = "The operation symbols (+, -, ×, ÷) are hidden. " +
+            "Tip: Use the clue value and cage size to deduce the operation. " +
+            "Small values often mean subtraction or division."
     ),
     ZERO_INCLUSIVE(
         displayName = "Zero Mode",
@@ -84,7 +89,10 @@ enum class GameMode(
         iconName = "loop",
         cFlags = 0x20,
         phase = 3,
-        implemented = true  // Clue values use mod N; solver verification WIP
+        implemented = true,  // Clue values use mod N; solver verification WIP
+        extendedTip = "Clue values wrap around using modular arithmetic (mod N). " +
+            "Example on a 5×5: 4+3=2 because 7 mod 5 = 2. " +
+            "Tip: Think of it like a clock where numbers wrap after N."
     ),
     KILLER(
         displayName = "Killer",
@@ -92,33 +100,37 @@ enum class GameMode(
         iconName = "block",
         cFlags = 0x40,
         phase = 3,
-        implemented = true
+        implemented = true,
+        extendedTip = "Like Killer Sudoku: each cage must contain unique digits. " +
+            "Tip: Look for cages that span multiple rows or columns - " +
+            "the no-repeat rule adds extra constraints beyond standard Latin square rules."
     ),
 
     // Phase 4: Research-Backed Innovations
+    // These modes are stubs - puzzles generate but lack specialized content
     HINT_MODE(
         displayName = "Tutorial",
-        description = "Explainable hints with reasoning",
+        description = "Step-by-step hints (stub: uses standard hints)",
         iconName = "school",
         cFlags = 0x80,
         phase = 4,
-        implemented = true
+        implemented = true  // Stub: falls back to basic hint system
     ),
     ADAPTIVE(
         displayName = "Adaptive",
-        description = "Difficulty adjusts to your skill",
+        description = "Difficulty adapts (stub: fixed difficulty)",
         iconName = "trending_up",
         cFlags = 0x100,
         phase = 4,
-        implemented = true
+        implemented = true  // Stub: no adaptive algorithm yet
     ),
     STORY(
         displayName = "Story",
-        description = "Themed puzzles with narrative",
+        description = "Themed puzzles (stub: standard puzzles)",
         iconName = "auto_stories",
         cFlags = 0x200,
         phase = 4,
-        implemented = true
+        implemented = true  // Stub: no story content yet
     );
 
     companion object {
@@ -148,8 +160,18 @@ enum class GameMode(
  * Extended grid size options.
  * Standard sizes 3-9 use decimal digits.
  * Extended sizes 10-16 use hex digits (A-G).
+ *
+ * Stability levels:
+ * - STABLE (3-9): ML model trained, reliable generation, good touch targets
+ * - EXPERIMENTAL (10-12): Generation may timeout, smaller touch targets
+ * - ADVANCED (16): Very long generation, requires zoom for usability
  */
-enum class GridSize(val size: Int, val displayName: String, val usesHex: Boolean = false) {
+enum class GridSize(
+    val size: Int,
+    val displayName: String,
+    val usesHex: Boolean = false,
+    val stability: Stability = Stability.STABLE
+) {
     SIZE_3(3, "3×3"),
     SIZE_4(4, "4×4"),
     SIZE_5(5, "5×5"),
@@ -157,15 +179,25 @@ enum class GridSize(val size: Int, val displayName: String, val usesHex: Boolean
     SIZE_7(7, "7×7"),
     SIZE_8(8, "8×8"),
     SIZE_9(9, "9×9"),
-    SIZE_10(10, "10×10", usesHex = true),
-    SIZE_12(12, "12×12", usesHex = true),
-    SIZE_16(16, "16×16", usesHex = true);
+    SIZE_10(10, "10×10", usesHex = true, stability = Stability.EXPERIMENTAL),
+    SIZE_12(12, "12×12", usesHex = true, stability = Stability.EXPERIMENTAL),
+    SIZE_16(16, "16×16", usesHex = true, stability = Stability.ADVANCED);
+
+    enum class Stability {
+        STABLE,       // ML-supported, fast generation, good UX
+        EXPERIMENTAL, // May timeout, reduced touch targets
+        ADVANCED      // Expert only, may require zoom
+    }
 
     companion object {
         fun fromInt(size: Int): GridSize = entries.find { it.size == size } ?: SIZE_5
         fun standardSizes(): List<GridSize> = entries.filter { !it.usesHex }
         fun extendedSizes(): List<GridSize> = entries.filter { it.usesHex }
         fun allSizes(): List<GridSize> = entries.toList()
+        fun stableSizes(): List<GridSize> = entries.filter { it.stability == Stability.STABLE }
+
+        /** Maximum size that works with extended modes (Zero/Negative/Modular/Powers) */
+        const val MAX_EXTENDED_MODE_SIZE = 9
     }
 }
 

@@ -283,6 +283,36 @@ fun GameModeSelector(
             color = Color(0xFFAAAAAA),
             modifier = Modifier.padding(horizontal = 4.dp)
         )
+
+        // Extended tip (if available) - shown with info icon
+        selectedMode.extendedTip?.let { tip ->
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp)
+                    .background(
+                        color = Color(0xFF2a2a4a).copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .padding(8.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Tip",
+                    tint = Color(0xFF7B68EE),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = tip,
+                    fontSize = 12.sp,
+                    color = Color(0xFF9999AA),
+                    lineHeight = 16.sp
+                )
+            }
+        }
     }
 }
 

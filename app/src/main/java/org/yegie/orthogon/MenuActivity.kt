@@ -12,6 +12,8 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.yegie.orthogon.data.GameMode
 import org.yegie.orthogon.ui.MenuScreen
 import org.yegie.orthogon.ui.MenuState
@@ -47,6 +49,7 @@ class MenuActivity : AppCompatActivity() {
 
         setContent {
             val prefs = getSharedPreferences(packageName + "_preferences", MODE_PRIVATE)
+            val lifecycleOwner = LocalLifecycleOwner.current
 
             // Load saved game mode, default to STANDARD
             val savedModeName = prefs.getString(MENU_MODE, GameMode.STANDARD.name)
@@ -66,6 +69,32 @@ class MenuActivity : AppCompatActivity() {
                         canContinue = app.isCanCont
                     )
                 )
+            }
+
+            // Refresh state when Activity resumes (e.g., returning from game)
+            // This ensures difficulty indicator matches saved game state
+            DisposableEffect(lifecycleOwner) {
+                val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        val currentModeName = prefs.getString(MENU_MODE, GameMode.STANDARD.name)
+                        val currentMode = try {
+                            GameMode.valueOf(currentModeName ?: GameMode.STANDARD.name)
+                        } catch (e: IllegalArgumentException) {
+                            GameMode.STANDARD
+                        }
+                        menuState = menuState.copy(
+                            selectedSize = app.gameSize.coerceIn(3, 16),
+                            selectedDifficulty = app.gameDiff,
+                            selectedMode = currentMode,
+                            multiplicationOnly = currentMode == GameMode.MULTIPLICATION_ONLY,
+                            canContinue = app.isCanCont
+                        )
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
             }
 
             MenuScreen(
@@ -103,12 +132,7 @@ class MenuActivity : AppCompatActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        // Update canContinue state when returning from game
-        // Note: State is managed in Compose, so we'd need to trigger recomposition
-        // For simplicity, this is handled in onCreate's initial state
-    }
+    // Note: State refresh on resume is handled by DisposableEffect in setContent
 
     override fun onPause() {
         app.savePrefs()
@@ -116,6 +140,13 @@ class MenuActivity : AppCompatActivity() {
     }
 
     private fun startGame(state: MenuState) {
+        // Story mode launches the book experience instead of a puzzle
+        if (state.selectedMode == GameMode.STORY) {
+            val intent = Intent(this, StoryActivity::class.java)
+            startActivity(intent)
+            return
+        }
+
         val intent = Intent(this, KenKenActivity::class.java).apply {
             putExtra(GAME_CONT, false)
             putExtra(GAME_SIZE, state.selectedSize)

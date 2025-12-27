@@ -9,10 +9,10 @@ import math
 
 class MassiveLatinSquareDataset(Dataset):
     """
-    Dataset generator for grids from 3x3 to 9x9.
+    Dataset generator for grids from 3x3 to 16x16.
     """
 
-    def __init__(self, data_path=None, max_size=9):
+    def __init__(self, data_path=None, max_size=16):
         self.max_size = max_size
         self.samples = []
         if data_path and os.path.exists(data_path):
@@ -21,7 +21,7 @@ class MassiveLatinSquareDataset(Dataset):
                 if not key.startswith("size"):
                     continue
                 size = int(key.replace("size", ""))
-                if size < 3 or size > 9:
+                if size < 3 or size > max_size:
                     continue
                 grids = data[key]
                 for g in grids:
@@ -52,10 +52,10 @@ class MassiveLatinSquareDataset(Dataset):
 
 class RelationalTransformer(nn.Module):
     """
-    Transformer-based solver for variable sized grids up to 9x9.
+    Transformer-based solver for variable sized grids up to 16x16.
     """
 
-    def __init__(self, max_size=9, num_classes=10, d_model=128, nhead=8, num_layers=6):
+    def __init__(self, max_size=16, num_classes=17, d_model=128, nhead=8, num_layers=6):
         super().__init__()
         self.max_size = max_size
         self.embedding = nn.Embedding(num_classes, d_model)
@@ -101,7 +101,7 @@ def train_massive():
 
     gpu_info = get_gpu_info()
     print(f"GPU: {gpu_info['name']} ({gpu_info['sm_count']} SMs)")
-    print(f"Training Model (3x3 to 9x9) on {device} (AMP: {use_amp})...")
+    print(f"Training Model (3x3 to 16x16) on {device} (AMP: {use_amp})...")
 
     # Enable TF32 for tensor cores (significant speedup on Ampere+)
     if device.type == "cuda" and gpu_info["compute_cap"][0] >= 8:
@@ -109,7 +109,7 @@ def train_massive():
         print("TF32 enabled for tensor cores.")
 
     # Load and split dataset (80/20 train/val)
-    full_dataset = MassiveLatinSquareDataset("data/latin_squares_massive.npz", max_size=9)
+    full_dataset = MassiveLatinSquareDataset("data/latin_squares_massive.npz", max_size=16)
     train_size = int(0.8 * len(full_dataset))
     val_size = len(full_dataset) - train_size
     train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
@@ -117,7 +117,7 @@ def train_massive():
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
 
-    model = RelationalTransformer(max_size=9, num_classes=10).to(device)
+    model = RelationalTransformer(max_size=16, num_classes=17).to(device)
 
     # Use torch.compile with appropriate mode based on GPU SMs
     # max-autotune requires 80+ SMs; use reduce-overhead for smaller GPUs
@@ -172,26 +172,26 @@ def train_massive():
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(model.state_dict(), "keen_solver_9x9_best.pth")
+            torch.save(model.state_dict(), "keen_solver_16x16_best.pth")
 
         scheduler.step()
 
     # Save model
-    torch.save(model.state_dict(), "keen_solver_9x9.pth")
+    torch.save(model.state_dict(), "keen_solver_16x16.pth")
     print("Model saved.")
 
     # Export to ONNX
     print("Exporting to ONNX...")
     model.eval()
-    dummy_input = torch.zeros(1, 9, 9).long().to(device)
+    dummy_input = torch.zeros(1, 16, 16).long().to(device)
     torch.onnx.export(
         model,
         dummy_input,
-        "keen_solver_9x9.onnx",
+        "keen_solver_16x16.onnx",
         input_names=["input_grid"],
         output_names=["cell_logits"],
     )
-    print("ONNX Export complete: keen_solver_9x9.onnx")
+    print("ONNX Export complete: keen_solver_16x16.onnx")
 
 
 if __name__ == "__main__":

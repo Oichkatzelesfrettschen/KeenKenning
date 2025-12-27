@@ -189,7 +189,8 @@ fun rememberGridNavigationState(
 fun isAndroidTv(): Boolean {
     val context = LocalContext.current
     return remember(context) {
-        val uiModeManager = context.getSystemService(android.app.UiModeManager::class.java)
+        @Suppress("DEPRECATION")
+        val uiModeManager = context.getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
         uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
     }
 }

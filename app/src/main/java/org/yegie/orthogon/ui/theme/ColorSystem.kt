@@ -58,6 +58,9 @@ data class CvdGameColors(
     val digitPencilMark: Color,
     val digitHint: Color,
     val operationSymbol: Color,
+    // Cage clue box (elevated surface with depth)
+    val clueBoxBackground: Color,
+    val clueBoxText: Color,
     // Zone category colors (with shape/pattern fallback)
     val zoneColors: List<Color>
 )
@@ -257,6 +260,8 @@ fun getCvdGameColors(
             digitPencilMark = GrayScale.gray400,
             digitHint = brand.accent,
             operationSymbol = GrayScale.gray300,
+            clueBoxBackground = OledColors.darkSurface,  // Subtle elevation on OLED
+            clueBoxText = GrayScale.gray100,
             zoneColors = zoneColors
         )
         // Standard dark mode
@@ -271,6 +276,8 @@ fun getCvdGameColors(
             digitPencilMark = GrayScale.gray400,
             digitHint = brand.accent,
             operationSymbol = GrayScale.gray300,
+            clueBoxBackground = GrayScale.gray700,  // Slightly lighter than cell for depth
+            clueBoxText = GrayScale.gray100,
             zoneColors = zoneColors
         )
         // Light mode (OLED setting ignored in light mode)
@@ -285,6 +292,8 @@ fun getCvdGameColors(
             digitPencilMark = GrayScale.gray500,
             digitHint = brand.accent,
             operationSymbol = GrayScale.gray700,
+            clueBoxBackground = Color(0xFFFAFAFA),  // Slightly off-white for subtle contrast
+            clueBoxText = GrayScale.gray900,
             zoneColors = zoneColors
         )
     }

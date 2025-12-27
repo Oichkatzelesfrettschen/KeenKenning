@@ -88,26 +88,40 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Load a model with optional elapsed time restoration.
+     *
+     * @param model The KenKenModel to load
+     * @param difficulty Difficulty level (0-4)
+     * @param isMlGenerated Whether the puzzle was ML-generated
+     * @param gameMode The current game mode
+     * @param preservedElapsedSeconds If provided, restore this elapsed time instead of resetting.
+     *                                 Use this when resuming a saved game.
+     */
     fun loadModel(
         model: KenKenModel,
         difficulty: Int = currentDifficulty,
         isMlGenerated: Boolean = currentIsMlGenerated,
-        gameMode: GameMode = currentGameMode
+        gameMode: GameMode = currentGameMode,
+        preservedElapsedSeconds: Long? = null
     ) {
         keenModel = model
         currentDifficulty = difficulty
         currentIsMlGenerated = isMlGenerated
         currentGameMode = gameMode
 
-        // Reset timer and game state
+        // Stop any running timer
         stopTimer()
-        accumulatedTime = 0
+
+        // Restore or reset timer based on whether we're resuming
+        val elapsed = preservedElapsedSeconds ?: 0L
+        accumulatedTime = elapsed
 
         _uiState.update {
             it.copy(
                 showVictoryAnimation = false,
                 victoryAnimationComplete = false,
-                elapsedTimeSeconds = 0,
+                elapsedTimeSeconds = elapsed,
                 timerRunning = false,
                 difficulty = difficulty,
                 difficultyName = getDifficultyName(difficulty),
@@ -117,8 +131,10 @@ class GameViewModel : ViewModel() {
         }
         refreshState()
 
-        // Start timer for new game
-        startTimer()
+        // Start timer (for new game it starts at 0, for resumed game it continues from preserved time)
+        if (!model.puzzleWon) {
+            startTimer()
+        }
     }
 
     private fun getDifficultyName(diff: Int): String = when (diff) {
@@ -167,6 +183,23 @@ class GameViewModel : ViewModel() {
     }
 
     fun getModel(): KenKenModel? = keenModel
+
+    /**
+     * Get the current elapsed time for saving.
+     * Includes accumulated time plus current session time.
+     */
+    fun getElapsedTimeForSave(): Long {
+        return if (timerJob?.isActive == true) {
+            accumulatedTime + (System.currentTimeMillis() - gameStartTime) / 1000
+        } else {
+            accumulatedTime
+        }
+    }
+
+    /**
+     * Get the current game mode for save/restore purposes.
+     */
+    fun getCurrentGameMode(): GameMode = currentGameMode
 
     private fun refreshState() {
         val model = keenModel ?: return

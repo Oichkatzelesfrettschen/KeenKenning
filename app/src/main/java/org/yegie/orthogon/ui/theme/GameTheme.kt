@@ -150,7 +150,23 @@ data class GameDimensions(
 
     // Spacing
     val gridPadding: Dp = 8.dp,
-    val controlSpacing: Dp = 12.dp
+    val controlSpacing: Dp = 12.dp,
+
+    // === Alignment & Positioning (ratio-based for adaptive scaling) ===
+
+    // Cage clue box - depth perception enhancement
+    val clueBoxElevation: Dp = 2.dp,              // Shadow depth for 3D effect
+    val clueBoxCornerRadius: Dp = 3.dp,           // Slightly rounded corners
+    val clueBoxPaddingHorizontal: Dp = 3.dp,      // Inner horizontal padding
+    val clueBoxPaddingVertical: Dp = 1.dp,        // Inner vertical padding
+
+    // Value number positioning (ratios of cell height for proportional scaling)
+    val valueVerticalOffsetRatio: Float = 0.10f,  // Offset when clue present (10% of cell height)
+
+    // Notes/hints grid sizing (ratios of cell size)
+    val noteBoxSizeRatio: Float = 0.28f,          // Each note box = 28% of cell width (for 3x3 grid)
+    val noteGridOffsetRatio: Float = 0.15f,       // Vertical offset when clue present (15% of cell height)
+    val hintGridOffsetRatio: Float = 0.18f        // Slightly larger offset for hints (18% of cell height)
 )
 
 // Large screen / tablet dimensions
@@ -166,7 +182,16 @@ val LargeGameDimensions = GameDimensions(
     buttonMinSize = 64.dp,
     touchTargetMin = 56.dp,
     gridPadding = 16.dp,
-    controlSpacing = 16.dp
+    controlSpacing = 16.dp,
+    // Large screen alignment tokens
+    clueBoxElevation = 3.dp,          // Slightly more depth on larger screens
+    clueBoxCornerRadius = 4.dp,
+    clueBoxPaddingHorizontal = 4.dp,
+    clueBoxPaddingVertical = 2.dp,
+    valueVerticalOffsetRatio = 0.08f, // Slightly less offset ratio (cells are bigger)
+    noteBoxSizeRatio = 0.26f,         // Slightly smaller ratio (more room)
+    noteGridOffsetRatio = 0.12f,
+    hintGridOffsetRatio = 0.15f
 )
 
 // Accessibility settings
