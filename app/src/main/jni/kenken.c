@@ -1111,28 +1111,16 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
         grid = latin_generate(w, rs);
 
         /*
-         * Zero-Inclusive mode: convert digits from 1..N to 0..(N-1)
+         * NOTE: Zero-Inclusive and Negative modes apply DISPLAY transformations
+         * only. The internal grid stays as 1..N because the solver's cube array
+         * is indexed by (digit - 1) and cannot handle 0 or negative values.
+         *
+         * The transformation is applied during solution encoding below.
+         * Clue values are calculated from 1..N (consistent, solvable puzzles).
+         *
+         * - Zero mode: UI displays 0..N-1, internally 1..N
+         * - Negative mode: UI displays -N/2..+N/2, internally 1..N
          */
-        if (HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE)) {
-            for (i = 0; i < a; i++) {
-                grid[i] -= 1;
-            }
-        }
-
-        /*
-         * Negative Numbers mode: convert digits from 1..N to -floor(N/2)..-1, 1..ceil(N/2)
-         * Example for N=5: 1,2,3,4,5 -> -2,-1,1,2,3
-         * Example for N=6: 1,2,3,4,5,6 -> -3,-2,-1,1,2,3
-         */
-        if (HAS_MODE(params->mode_flags, MODE_NEGATIVE)) {
-            int neg_count = w / 2;
-            for (i = 0; i < a; i++) {
-                if (grid[i] <= neg_count)
-                    grid[i] = grid[i] - neg_count - 1;  /* Maps to -neg_count..-1 */
-                else
-                    grid[i] = grid[i] - neg_count;      /* Maps to 1..(N-neg_count) */
-            }
-        }
 
         /*
          * Divide the grid into arbitrarily sized blocks, but so as
@@ -1532,17 +1520,19 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
         }
 
         /*
-         * Modular mode: apply mod N to all clue values, keeping in range 1..N
+         * NOTE: Modular mode clue value wrapping is DISABLED.
+         *
+         * The solver's clue verification logic at lines 548-609 checks exact
+         * clue values (e.g., "does this combination sum to exactly 15?").
+         * Wrapping clue values with mod N breaks this verification because
+         * the solver doesn't know to apply inverse modular arithmetic.
+         *
+         * For now, Modular mode puzzles use standard clue values but the UI
+         * can indicate "mod N" in the display. Full modular arithmetic support
+         * would require modifying the solver's candidate verification.
+         *
+         * TODO: Implement modular arithmetic in solver_common() for true mod N
          */
-        if (HAS_MODE(params->mode_flags, MODE_MODULAR)) {
-            for (i = 0; i < a; i++) {
-                j = dsf_canonify(dsf, i);
-                if (j == i) {
-                    /* Map to 1..N range: ((val-1) mod N) + 1 */
-                    cluevals[j] = ((cluevals[j] - 1) % w + w) % w + 1;
-                }
-            }
-        }
 
         for (i = 0; i < a; i++) {
             j = dsf_canonify(dsf, i);
@@ -1652,15 +1642,45 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
     desc = sresize(desc, p - desc, char);
 
     /*
-     * Encode the solution.
+     * Encode the solution with mode-specific transformations.
+     *
+     * Internal grid is always 1..N. Apply display transformations:
+     * - Zero mode: output 0..N-1 (subtract 1)
+     * - Negative mode: output as signed values (-N/2 to +N/2 excluding 0)
+     * - Standard: output 1..N as-is
+     *
+     * For grids > 9, use hex digits (A=10, B=11, etc.)
      */
     assert(memcmp(soln, grid, a) == 0);
-    *aux = snewn(a + 2, char);
+    *aux = snewn(a * 3 + 2, char);  /* Extra space for negative signs */
 
-    for (i = 0; i < a; i++)
-        (*aux)[i] = '0' + soln[i];
-    (*aux)[a] = 'e';
-    (*aux)[a + 1] = '\0';
+    char *auxp = *aux;
+    for (i = 0; i < a; i++) {
+        int display_val = soln[i];
+
+        if (HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE)) {
+            display_val = soln[i] - 1;  /* 1..N -> 0..N-1 */
+        } else if (HAS_MODE(params->mode_flags, MODE_NEGATIVE)) {
+            int neg_count = w / 2;
+            if (soln[i] <= neg_count)
+                display_val = soln[i] - neg_count - 1;  /* 1..neg_count -> -neg_count..-1 */
+            else
+                display_val = soln[i] - neg_count;      /* neg_count+1..N -> 1..N-neg_count */
+        }
+
+        /* Encode value: use hex for 10+, handle negatives */
+        if (display_val < 0) {
+            *auxp++ = 'n';  /* Negative prefix */
+            *auxp++ = '0' + (-display_val);
+        } else if (display_val >= 10) {
+            *auxp++ = 'A' + (display_val - 10);
+        } else {
+            *auxp++ = '0' + display_val;
+        }
+    }
+    *auxp++ = 'e';
+    *auxp = '\0';
+    *aux = sresize(*aux, auxp - *aux + 1, char);
 
     sfree(grid);
     sfree(order);
@@ -1708,27 +1728,12 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
     memcpy(grid, input_grid, a * sizeof(digit));
 
     /*
-     * Zero-Inclusive mode: AI model generates 1..N values,
-     * convert them to 0..(N-1) for this mode.
+     * NOTE: Zero-Inclusive and Negative modes apply DISPLAY transformations
+     * only. The internal grid stays as 1..N because the solver's cube array
+     * is indexed by (digit - 1) and cannot handle 0 or negative values.
+     *
+     * See solution encoding below for where transformations are applied.
      */
-    if (HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE)) {
-        for (i = 0; i < a; i++) {
-            grid[i] -= 1;
-        }
-    }
-
-    /*
-     * Negative Numbers mode: convert digits from 1..N to -floor(N/2)..-1, 1..ceil(N/2)
-     */
-    if (HAS_MODE(params->mode_flags, MODE_NEGATIVE)) {
-        int neg_count = w / 2;
-        for (i = 0; i < a; i++) {
-            if (grid[i] <= neg_count)
-                grid[i] = grid[i] - neg_count - 1;
-            else
-                grid[i] = grid[i] - neg_count;
-        }
-    }
 
     /* Limit retries to prevent infinite loops with bad grids */
     int max_retries = 1000;
@@ -2050,15 +2055,10 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
             }
         }
 
-        /* Modular mode: apply mod N to all clue values, keeping in range 1..N */
-        if (HAS_MODE(params->mode_flags, MODE_MODULAR)) {
-            for (i = 0; i < a; i++) {
-                j = dsf_canonify(dsf, i);
-                if (j == i) {
-                    cluevals[j] = ((cluevals[j] - 1) % w + w) % w + 1;
-                }
-            }
-        }
+        /*
+         * NOTE: Modular mode clue value wrapping is DISABLED.
+         * See comments in new_game_desc() for details.
+         */
 
         for (i = 0; i < a; i++) {
             j = dsf_canonify(dsf, i);
@@ -2150,14 +2150,37 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
 
     desc = sresize(desc, p - desc, char);
 
-    /* Encode solution */
+    /* Encode solution with mode-specific transformations */
     assert(memcmp(soln, grid, a * sizeof(digit)) == 0);
-    *aux = snewn(a + 2, char);
+    *aux = snewn(a * 3 + 2, char);  /* Extra space for negative signs */
 
-    for (i = 0; i < a; i++)
-        (*aux)[i] = '0' + soln[i];
-    (*aux)[a] = 'e';
-    (*aux)[a + 1] = '\0';
+    char *auxp = *aux;
+    for (i = 0; i < a; i++) {
+        int display_val = soln[i];
+
+        if (HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE)) {
+            display_val = soln[i] - 1;  /* 1..N -> 0..N-1 */
+        } else if (HAS_MODE(params->mode_flags, MODE_NEGATIVE)) {
+            int neg_count = w / 2;
+            if (soln[i] <= neg_count)
+                display_val = soln[i] - neg_count - 1;
+            else
+                display_val = soln[i] - neg_count;
+        }
+
+        /* Encode value: use hex for 10+, handle negatives */
+        if (display_val < 0) {
+            *auxp++ = 'n';  /* Negative prefix */
+            *auxp++ = '0' + (-display_val);
+        } else if (display_val >= 10) {
+            *auxp++ = 'A' + (display_val - 10);
+        } else {
+            *auxp++ = '0' + display_val;
+        }
+    }
+    *auxp++ = 'e';
+    *auxp = '\0';
+    *aux = sresize(*aux, auxp - *aux + 1, char);
 
     sfree(grid);
     sfree(order);
