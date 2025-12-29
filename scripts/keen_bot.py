@@ -5,7 +5,7 @@ import re
 import os
 
 ADB = "/opt/android-sdk/platform-tools/adb"
-PACKAGE = "org.yegie.keenkeenforandroid"
+PACKAGE = "org.yegie.keenkenning.kenning"  # Keen Kenning flavor
 
 def run_adb(cmd):
     full_cmd = f"{ADB} {cmd}"

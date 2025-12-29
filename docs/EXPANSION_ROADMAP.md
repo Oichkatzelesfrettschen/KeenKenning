@@ -1,8 +1,8 @@
-# Orthogon Expansion Roadmap
+# Keen Kenning Expansion Roadmap
 
 **Date:** December 26, 2025
 **Scope:** Comprehensive TODO analysis with research-backed implementation paths
-**Goal:** Transform Orthogon into an ultrafast, ultrafun Latin square puzzle platform
+**Goal:** Transform Keen Kenning into an ultrafast, ultrafun Latin square puzzle platform
 
 ---
 
@@ -148,8 +148,8 @@ if (w == 3 && diff > DIFF_NORMAL)
 3. C generates cages and validates solvability
 
 **From Analysis:**
-- AI model (keen_solver_9x9.onnx) handles 4x4 through 9x9
-- Could extend to 16x16 with larger model training
+- AI model (latin_solver.onnx) handles 3x3 through 16x16
+- Trained with curriculum learning and constraint-aware loss
 - Eliminates exhaustive Latin square search entirely
 
 ### Implementation Path
@@ -303,7 +303,7 @@ if (w == 3 && diff > DIFF_NORMAL)
 2. **Phase 2: JNI Bridge**
    ```c
    JNIEXPORT jintArray JNICALL
-   Java_org_yegie_orthogon_KenKenModelBuilder_validateGrid(
+   Java_org_yegie_keenkenning_KenKenModelBuilder_validateGrid(
        JNIEnv *env, jobject instance,
        jintArray gridFlat, jint size);
    ```
@@ -376,7 +376,7 @@ if (w == 3 && diff > DIFF_NORMAL)
 3. **Phase 3: JNI Bridge**
    ```c
    JNIEXPORT jstring JNICALL
-   Java_org_yegie_orthogon_KenKenModelBuilder_getHint(
+   Java_org_yegie_keenkenning_KenKenModelBuilder_getHint(
        JNIEnv *env, jobject instance,
        jintArray gridFlat, jintArray pencilMarks, jint size);
    ```

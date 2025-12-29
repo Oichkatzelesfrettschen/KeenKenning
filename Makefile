@@ -1,4 +1,7 @@
-# KeenKeenForAndroid - Unified Build System
+# KeenKenning - Unified Build System
+# Keen puzzle game for Android with two flavors:
+#   - Keen Classik: Traditional (3-9 grids, no ML)
+#   - Keen Kenning: Advanced (3-16 grids, ML-enabled)
 # Acts as the single entry point for all development tasks.
 
 # Configuration
@@ -68,7 +71,7 @@ latin_gen_opt: $(SOURCES)
 
 TRAIN_COUNT ?= 10000
 ASSETS_DIR = app/src/main/assets
-MODEL_NAME = keen_solver_9x9.onnx
+MODEL_NAME = latin_solver.onnx
 
 generate-data: tools ## Generate Latin square training data (3x3 to 9x9)
 	@echo "Generating $(TRAIN_COUNT) grids per size (3x3 to 9x9)..."
@@ -117,8 +120,8 @@ check-env: ## Verify development environment
 	@echo "Checking ADB..."
 	@adb version > /dev/null 2>&1 && echo "OK: ADB found" || echo "WARN: ADB not found"
 
-run-modern: install ## Run the app in Modern Mode
-	adb shell am start -n org.yegie.keenkeenforandroid/.KeenActivity --ez useClassic false
+run-kenning: install ## Run the app (Kenning flavor - ML enabled)
+	adb shell am start -n org.yegie.keenkenning.kenning/.KeenActivity
 
-run-classic: install ## Run the app in Classic Mode
-	adb shell am start -n org.yegie.keenkeenforandroid/.KeenActivity --ez useClassic true
+run-classik: install ## Run the app (Classik flavor - no ML)
+	adb shell am start -n org.yegie.keenkenning.classik/.KeenActivity

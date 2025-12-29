@@ -1,10 +1,14 @@
-# Orthogon for Android
+# Keen Kenning for Android
 
-A modern, feature-rich KenKen logic puzzle game for Android phones and tablets, with Android TV support. Built with Jetpack Compose and powered by native C algorithms with optional neural ML assistance.
+A modern, feature-rich Keen (KenKen-style) logic puzzle game for Android phones and tablets, with Android TV support. Built with Jetpack Compose and powered by native C algorithms with optional neural ML assistance.
+
+Two product flavors available:
+- **Keen Classik**: Traditional mode (3×3-9×9 grids, no ML)
+- **Keen Kenning**: Advanced mode (3×3-16×16 grids, ML-enabled)
 
 ## Download
 
-**[Latest Release (v0.0.1 Pre-Alpha)](https://github.com/Oichkatzelesfrettschen/Orthogon/releases/tag/v0.0.1)**
+**[Latest Release](https://github.com/Oichkatzelesfrettschen/KeenKenning/releases)**
 
 | APK | Architecture | Size | Notes |
 |-----|--------------|------|-------|
@@ -92,7 +96,7 @@ Output: `app/build/outputs/apk/debug/`
 │  keen.c • keen-android-jni.c (via CMake/NDK)                │
 ├─────────────────────────────────────────────────────────────┤
 │                     AI Layer                                │
-│  keen_solver_9x9.onnx (ONNX Runtime)                        │
+│  latin_solver.onnx (ONNX Runtime, 3-16 grids)               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -100,7 +104,7 @@ Output: `app/build/outputs/apk/debug/`
 
 1. **First launch**: Initial puzzle generation may take 1-2 seconds on older devices
 2. **Large grids**: 16×16 puzzles require significant computation time
-3. **Neural hints**: AI suggestions work best for grids 4×4 to 9×9
+3. **Neural hints**: AI supports all grid sizes 3×3 to 16×16
 
 ## Testing Checklist for Debug Testers
 
@@ -122,7 +126,7 @@ Output: `app/build/outputs/apk/debug/`
 
 - **Core Algorithms**: [Simon Tatham's Portable Puzzle Collection](https://www.chiark.greenend.org.uk/~sgtatham/puzzles/)
 - **Original Android Port**: Sergey Maltsev
-- **Orthogon Enhancements**: Orthogon Contributors
+- **Keen Kenning Enhancements**: KeenKenning Contributors
 
 ## License
 
@@ -130,4 +134,4 @@ MIT
 
 ---
 
-*Debug build - Report issues at [GitHub Issues](https://github.com/Oichkatzelesfrettschen/Orthogon/issues)*
+*Debug build - Report issues at [GitHub Issues](https://github.com/Oichkatzelesfrettschen/KeenKenning/issues)*

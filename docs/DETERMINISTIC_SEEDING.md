@@ -2,10 +2,10 @@
   DETERMINISTIC_SEEDING.md: Documentation for reproducible puzzle generation
 
   SPDX-License-Identifier: GPL-3.0-or-later
-  SPDX-FileCopyrightText: Copyright (C) 2024-2025 Orthogon Contributors
+  SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors
 -->
 
-# Deterministic Seeding in Orthogon
+# Deterministic Seeding in Keen Kenning
 
 This document describes the seeding architecture that enables reproducible puzzle
 generation. Understanding seeding is essential for debugging, sharing puzzles,
@@ -13,7 +13,7 @@ implementing "daily challenge" features, and ensuring test reproducibility.
 
 ## Overview
 
-Orthogon supports deterministic puzzle generation where the same seed value
+Keen Kenning supports deterministic puzzle generation where the same seed value
 produces the identical puzzle across sessions and devices (for native generation).
 This is achieved through a SHA-based PRNG in the C layer.
 
@@ -205,7 +205,7 @@ All users will get the same puzzle for the same day.
 Puzzles can be shared as compact URLs:
 
 ```
-orthogon://puzzle?seed=1735170000000&size=6&diff=2
+keenkenning://puzzle?seed=1735170000000&size=6&diff=2
 ```
 
 Recipient generates the identical puzzle locally.

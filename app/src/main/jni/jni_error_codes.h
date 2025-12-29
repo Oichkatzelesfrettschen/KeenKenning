@@ -2,7 +2,7 @@
  * jni_error_codes.h: Structured error codes for JNI boundary
  *
  * SPDX-License-Identifier: MIT
- * SPDX-FileCopyrightText: Copyright (C) 2024-2025 Orthogon Contributors
+ * SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors
  *
  * Defines error codes returned from native puzzle generation.
  * The JNI layer returns strings in the format:

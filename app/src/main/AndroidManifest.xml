@@ -23,7 +23,7 @@
         android:name=".ApplicationCore"
         android:theme="@style/AppTheme.Base.Light"
         >
-        <activity android:name="org.yegie.orthogon.MenuActivity"
+        <activity android:name="org.yegie.keenkenning.MenuActivity"
                   android:exported="true"
                   android:launchMode="singleTop">
             <intent-filter>
@@ -38,12 +38,10 @@
             </intent-filter>
         </activity>
 
-        <activity android:name="org.yegie.orthogon.KenKenActivity"
+        <activity android:name="org.yegie.keenkenning.KeenActivity"
             android:exported="true"/>
 
-        <activity android:name="org.yegie.orthogon.StoryActivity"
-            android:exported="false"
-            android:theme="@style/AppTheme.Base.Light"/>
+        <!-- StoryActivity is in kenning/AndroidManifest.xml (ML-enabled build only) -->
     </application>
 
 </manifest>

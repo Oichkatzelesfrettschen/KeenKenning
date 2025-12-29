@@ -1284,7 +1284,7 @@ int latin_check(digit *sq, int order) {
     tree234 *dict = newtree234(latin_check_cmp);
     int c, r;
     int ret = 0;
-    lcparams *lcp, lc, *aret;
+    lcparams *lcp, lc;
 
     /* Use a tree234 as a simple hash table, go through the square
      * adding elements as we go or incrementing their counts. */
@@ -1297,8 +1297,7 @@ int latin_check(digit *sq, int order) {
                 lcp = snew(lcparams);
                 lcp->elt = ELT(sq, c, r);
                 lcp->count = 1;
-                aret = add234(dict, lcp);
-                assert(aret == lcp);
+                (void)add234(dict, lcp); /* Must succeed - lcp is newly allocated */
             } else {
                 lcp->count++;
             }

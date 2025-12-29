@@ -2,13 +2,13 @@
  * dlx.h: Algorithm X with Dancing Links for Exact Cover Problems
  *
  * SPDX-License-Identifier: MIT
- * SPDX-FileCopyrightText: Copyright (C) 2024-2025 Orthogon Contributors
+ * SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors
  *
  * Clean-room implementation based on Donald Knuth's algorithm description
  * from "Dancing Links" (2000), available at https://arxiv.org/abs/cs/0011047
  *
  * The algorithm itself is not copyrightable; this is an independent
- * implementation for the Orthogon project.
+ * implementation for the Keen Kenning project.
  */
 
 #ifndef DLX_H

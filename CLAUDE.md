@@ -1,14 +1,18 @@
-# Orthogon - Project Memory
+# KeenKenning - Project Memory
 
 ## Overview
 
-Android KenKen puzzle game with mathematical branding. Combines:
-- **Kotlin/Compose UI** (`app/src/main/java/org/yegie/orthogon/ui/`)
-- **Java integration layer** (`KenKenModelBuilder.java`, `NeuralKenKenGenerator.java`)
-- **C backend** (`app/src/main/jni/kenken.c`) via JNI
-- **ONNX neural solver** (`keen_solver_9x9.onnx` supporting 4x4-9x9 grids)
+Android Keen puzzle game (KenKen-style) with two product flavors:
+- **Keen Classik**: Traditional mode (3×3-9×9 grids, no ML)
+- **Keen Kenning**: Advanced mode (3×3-16×16 grids, ML-enabled)
 
-Package: `org.yegie.orthogon`
+Architecture:
+- **Kotlin/Compose UI** (`app/src/main/java/org/yegie/keenkenning/ui/`)
+- **Java integration layer** (`KeenModelBuilder.java`)
+- **C backend** (`app/src/main/jni/keen.c`) via JNI
+- **ONNX neural solver** (3×3-16×16 grids, Kenning flavor only)
+
+Package: `org.yegie.keenkenning` (with `.classik` or `.kenning` suffix)
 
 ## Build
 
@@ -28,19 +32,18 @@ Requirements: JDK 21, Android SDK, NDK 27.x
 ## Standards
 
 - **Warnings as errors**: Lint `warningsAsErrors = true` in `app/build.gradle`
-- **Package naming**: JNI functions follow `Java_org_yegie_orthogon_<Class>_<Method>`
-- **Internal naming**: Classes use "KenKen" (the puzzle name), not "Keen"
-- **AI models**: Production model is `keen_solver_9x9.onnx`
+- **Package naming**: JNI functions follow `Java_org_yegie_keenkenning_<Class>_<Method>`
+- **Internal naming**: Classes use "Keen" prefix (trademark-compliant, not "KenKen")
+- **AI models**: `latin_solver.onnx` (3×3-16×16, Kenning flavor only)
 - **Compose**: UI uses Jetpack Compose in `GameScreen.kt`, `GameViewModel.kt`
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `app/src/main/jni/kenken.c` | Core puzzle generation (C) |
-| `app/src/main/jni/kenken-android-jni.c` | JNI bridge |
-| `NeuralKenKenGenerator.java` | ONNX Runtime inference |
-| `KenKenModelBuilder.java` | Game state management |
+| `app/src/main/jni/keen.c` | Core puzzle generation (C) |
+| `app/src/main/jni/keen-android-jni.c` | JNI bridge |
+| `KeenModelBuilder.java` | Game state management |
 | `GameScreen.kt` | Compose UI with quantum visualization |
 | `ui/theme/ColorSystem.kt` | CVD-accessible colors, OLED mode |
 | `ui/theme/DesignTokens.kt` | Typography, spacing, battery saver |
@@ -56,7 +59,8 @@ Requirements: JDK 21, Android SDK, NDK 27.x
 
 1. **JDK version mismatch**: Gradle 8.6 requires JDK 21, not 25
 2. **JNI naming**: Function names must match exact package path with underscores
-3. **Native library**: Must be named `kenken-android-jni` (matches CMakeLists.txt)
+3. **Native library**: Must be named `keen-android-jni` (matches CMakeLists.txt)
+4. **Trademark**: Use "Keen" prefix for class names (not "KenKen" which is trademarked)
 
 ## References
 

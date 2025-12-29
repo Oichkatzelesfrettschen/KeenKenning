@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ * AndroidManifest.xml (Kenning flavor additions)
+ *
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors
+ *
+ * This manifest merges with main/AndroidManifest.xml for the Kenning flavor.
+ * Contains activities and components specific to the ML-enabled build.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Story Mode Activity (Kenning only) -->
+        <activity android:name="org.yegie.keenkenning.StoryActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme.Base.Light"/>
+    </application>
+</manifest>

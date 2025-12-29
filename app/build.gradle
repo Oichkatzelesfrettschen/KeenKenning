@@ -4,12 +4,12 @@ plugins {
 }
 
 android {
-    namespace 'org.yegie.orthogon'
+    namespace 'org.yegie.keenkenning'
     compileSdk 35
     ndkVersion "27.2.12479018"
 
     defaultConfig {
-        applicationId "org.yegie.orthogon"
+        applicationId "org.yegie.keenkenning"
         minSdk 22
         targetSdk 35
         versionCode 131
@@ -53,9 +53,33 @@ android {
         kotlinCompilerExtensionVersion '1.5.10'
     }
 
+    flavorDimensions += "variant"
+
+    productFlavors {
+        classik {
+            dimension "variant"
+            applicationIdSuffix ".classik"
+            versionNameSuffix "-classik"
+            buildConfigField "int", "MIN_GRID_SIZE", "3"
+            buildConfigField "int", "MAX_GRID_SIZE", "9"
+            buildConfigField "boolean", "ML_ENABLED", "false"
+            resValue "string", "app_name", "Keen Classik"
+        }
+        kenning {
+            dimension "variant"
+            applicationIdSuffix ".kenning"
+            versionNameSuffix "-kenning"
+            buildConfigField "int", "MIN_GRID_SIZE", "3"
+            buildConfigField "int", "MAX_GRID_SIZE", "16"
+            buildConfigField "boolean", "ML_ENABLED", "true"
+            resValue "string", "app_name", "Keen Kenning"
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -123,5 +147,6 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.7.0'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
-    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.19.0'
+    // ONNX Runtime only included in kenning flavor (ML-enabled)
+    kenningImplementation 'com.microsoft.onnxruntime:onnxruntime-android:1.19.0'
 }

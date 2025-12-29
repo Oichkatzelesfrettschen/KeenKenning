@@ -12,7 +12,7 @@ Architecture:
   Output: Dense(1, Sigmoid) -> skill score 0-1
 
 SPDX-License-Identifier: MIT
-SPDX-FileCopyrightText: Copyright (C) 2024-2025 Orthogon Contributors
+SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors
 """
 
 import argparse

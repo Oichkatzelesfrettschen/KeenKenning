@@ -1,7 +1,7 @@
 [project]
-name = "keenkeen-ai"
+name = "keenkenning-ai"
 version = "1.0.0"
-description = "Neural puzzle generator for KeenKeenForAndroid"
+description = "Neural puzzle generator for Keen Kenning"
 requires-python = ">=3.10"
 
 [tool.ruff]

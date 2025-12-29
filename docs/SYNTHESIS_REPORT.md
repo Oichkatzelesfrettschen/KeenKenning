@@ -1,7 +1,7 @@
 # Synthesis Report: Project Harmonization & AI Integration
 
 ## Executive Summary
-This report details the comprehensive audit, refactoring, and feature integration performed on the `Orthogon` repository. The primary goals were to establish a "Zero Warning" build policy, harmonize the file structure, and fully integrate the Neural AI solver.
+This report details the comprehensive audit, refactoring, and feature integration performed on the `Keen Kenning` repository. The primary goals were to establish a "Zero Warning" build policy, harmonize the file structure, and fully integrate the Neural AI solver.
 
 ## 1. Build System Harmonization
 - **Java Compatibility**: Detected and resolved a critical incompatibility between Gradle 8.6 and OpenJDK 25 (Preview) by enforcing **OpenJDK 21** via `gradle.properties` and a custom `scripts/build.sh`.
@@ -18,8 +18,8 @@ This report details the comprehensive audit, refactoring, and feature integratio
 
 ## 3. AI Feature Integration (Synthesis)
 - **NeuralKeenGenerator**: Implemented the ONNX Runtime inference loop.
-    - **Logic**: Loads `keen_solver_9x9.onnx` from assets -> Run Inference -> Argmax Logits -> Return `int[]` Grid.
-    - **Constraints**: Supports grids up to 9x9 (trained model capability).
+    - **Logic**: Loads `latin_solver.onnx` from assets -> Run Inference -> Argmax Logits -> Return `int[]` Grid.
+    - **Constraints**: Supports grids 3x3 to 16x16 (trained model capability).
     - **Fallback**: Seamlessly falls back to algorithmic generation if AI fails or size mismatches.
 - **UI**: The "Enable AI Gen" toggle in `MenuActivity` now triggers this flow.
 
@@ -30,5 +30,5 @@ The repository is now in a **Harmonized State**.
 - **AI Status**: INTEGRATED (Ready for device testing with 4x4 puzzles).
 
 ## Next Steps
-- **Model Training**: Current `keen_solver_9x9.onnx` supports 4x4-9x9 grids, trained via `scripts/ai/train_massive_model.py`.
+- **Model Training**: Current `latin_solver.onnx` supports 3x3-16x16 grids, trained via `scripts/ai/train_autoregressive.py`.
 - **Unit Testing**: Add Instrumentation tests to verify ONNX loading on physical devices.

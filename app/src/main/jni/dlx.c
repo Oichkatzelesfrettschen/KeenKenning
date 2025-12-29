@@ -2,7 +2,7 @@
  * dlx.c: Algorithm X with Dancing Links for Exact Cover Problems
  *
  * SPDX-License-Identifier: MIT
- * SPDX-FileCopyrightText: Copyright (C) 2024-2025 Orthogon Contributors
+ * SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors
  *
  * Clean-room implementation based on Donald Knuth's algorithm description.
  * The core insight: removing and restoring nodes in doubly-linked lists

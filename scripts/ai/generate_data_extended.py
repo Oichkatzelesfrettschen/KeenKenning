@@ -6,7 +6,7 @@ For sizes 3-9: Uses optimized C binary (latin_gen) if available
 For sizes 10-16: Uses Python-based generation (Jacobson-Matthews algorithm)
 
 SPDX-License-Identifier: MIT
-SPDX-FileCopyrightText: Copyright (C) 2024-2025 Orthogon Contributors
+SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors
 """
 
 import argparse

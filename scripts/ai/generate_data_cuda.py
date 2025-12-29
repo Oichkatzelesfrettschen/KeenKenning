@@ -10,7 +10,8 @@ def generate_latin_squares_cuda(batch_size=1000, size=9, device="cuda", max_step
     Faster than CPU backtracking for large batches of small-to-medium grids.
     """
     print(
-        f"--- CUDA Generation: {batch_size} grids of size {size}x{size} on {device} ---"
+        f"--- CUDA Generation: {batch_size} grids of size {size}x{size} on {device} ---",
+        flush=True
     )
 
     # Initialize random grids: (B, N, N) with values 0..N-1
@@ -175,7 +176,8 @@ def generate_latin_squares_cuda(batch_size=1000, size=9, device="cuda", max_step
 
     duration = time.time() - start_time
     print(
-        f"Finished. Generated {len(completed_grids)}/{batch_size} unique grids in {duration:.2f}s"
+        f"Finished. Generated {len(completed_grids)}/{batch_size} unique grids in {duration:.2f}s",
+        flush=True
     )
     return completed_grids
 

@@ -1,4 +1,4 @@
-# Orthogon - Synthesis Roadmap
+# Keen Kenning - Synthesis Roadmap
 
 ## Executive Summary
 

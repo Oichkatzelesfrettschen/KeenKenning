@@ -3,7 +3,7 @@
 train_enhanced.py: Enhanced ML training pipeline for Latin square solving
 
 SPDX-License-Identifier: MIT
-SPDX-FileCopyrightText: Copyright (C) 2024-2025 Orthogon Contributors
+SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors
 
 Improvements over train_massive_model.py:
 - Curriculum learning (start small, grow)

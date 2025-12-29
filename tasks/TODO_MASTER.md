@@ -1,4 +1,4 @@
-# Master Task Tracker: Orthogon Refinement
+# Master Task Tracker: Keen Kenning Refinement
 
 ## I. Quality Assurance & Build Discipline
 - [x] **Build Baseline**: Execute `./gradlew assembleDebug` and capture all errors/warnings.
@@ -16,8 +16,8 @@
 - [x] **C/C++**: Verified JNI Bridge `keen-android-jni.c` handles AI grid input correctly.
 - [x] **AI Integration**:
     - [x] `NeuralKeenGenerator.java` implemented with ONNX Runtime.
-    - [x] `keen_solver_9x9.onnx` verified in assets (supports 4x4-9x9 grids).
-    - [x] Size check (4x4) implemented for safety.
+    - [x] `latin_solver.onnx` verified in assets (supports 3x3-16x16 grids).
+    - [x] Size check implemented for full range (3-16).
 
 ## IV. Synthesis & Expansion
 - [x] **Feature**: Neural/Classic toggle is present in UI (`activity_menu.xml`) and wired in `KeenModelBuilder`.

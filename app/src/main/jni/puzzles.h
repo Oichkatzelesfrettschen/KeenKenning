@@ -2,13 +2,13 @@
  * puzzles.h: Core data types and utilities for puzzle generation
  *
  * Provides fundamental types, memory management wrappers, and input handling
- * constants used throughout the KenKen puzzle engine. Adapted for Orthogon's
+ * constants used throughout the KenKen puzzle engine. Adapted for Keen Kenning's
  * Android JNI environment while maintaining compatibility with the original
  * puzzle collection API.
  *
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (C) 2004-2024 Simon Tatham
- * SPDX-FileCopyrightText: Copyright (C) 2024-2025 Orthogon Contributors
+ * SPDX-FileCopyrightText: Copyright (C) 2024-2025 KeenKenning Contributors
  *
  * Based on Simon Tatham's Portable Puzzle Collection
  * Original source: https://www.chiark.greenend.org.uk/~sgtatham/puzzles/

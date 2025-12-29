@@ -1,4 +1,4 @@
-# Orthogon - Development Roadmap
+# Keen Kenning - Development Roadmap
 
 ## Phase 1: Harmonization & Cleanup
 - [ ] **Directory Organization**: Move root docs to `docs/`, standardize file structure.
@@ -17,7 +17,7 @@
 ## Phase 4: Neural Integration
 - [x] **Architecture Scope**: Define model size and integration point (ONNX/JNI).
 - [ ] **Environment Setup**: Create `scripts/ai` and `requirements.txt`.
-- [x] **AI Model**: Exported `keen_solver_9x9.onnx` (supports 4x4-9x9 grids).
+- [x] **AI Model**: Exported `latin_solver.onnx` (supports 3x3-16x16 grids).
 - [x] **Integration**: Implement `NeuralKeenGenerator.java` with ONNX Runtime.
 - [x] **UI Toggle**: Add "Classic/Neural" switch.
 

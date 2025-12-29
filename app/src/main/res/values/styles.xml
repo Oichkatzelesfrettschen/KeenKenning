@@ -6,7 +6,7 @@
         <attr name="backgroundCardColor" format="color"/>
     </declare-styleable>
 
-    <!-- Base application theme using Orthogon Indigo-Magenta palette -->
+    <!-- Base application theme using Keen Kenning Indigo-Magenta palette -->
     <style name="AppTheme.Base.Light" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
