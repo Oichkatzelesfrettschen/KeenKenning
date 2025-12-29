@@ -55,19 +55,25 @@ The `train_autoregressive.py` script is the production training pipeline with:
 
 | Feature | Description |
 |---------|-------------|
-| **Curriculum Learning** | 4 stages: [3-5] → [3-8] → [3-12] → [3-16] |
+| **Multi-Dim Curriculum** | Size [3-5]→[3-16], Mode [STD→ALL], Fill [70%→0%] |
 | **Variable Fill Ratios** | Training matches inference (empty → full) |
 | **Cosine LR + Warmup** | nanoGPT-style schedule with min_lr floor |
 | **AdamW β₂=0.95** | Faster gradient adaptation |
+| **Precision Control** | FP32, FP16 (default), BF16 (Ampere+) |
+| **Gradient Checkpointing** | ~30% memory savings, ~20% speed cost |
 
 ### Usage
 
 ```bash
-# Full training with curriculum (recommended)
-python train_autoregressive.py --curriculum --epochs 60 --target-loss 0.09
+# Full training with all curriculum dimensions (recommended)
+python train_autoregressive.py --curriculum --mode-curriculum --fill-curriculum \
+    --epochs 60 --target-loss 0.09
 
 # Quick test run
 python train_autoregressive.py --epochs 5 --batch-size 64
+
+# BF16 precision with gradient checkpointing (memory-efficient)
+python train_autoregressive.py --dtype bf16 --grad-checkpoint --curriculum
 
 # Custom configuration
 python train_autoregressive.py \
@@ -75,7 +81,7 @@ python train_autoregressive.py \
     --output latin_solver \
     --d-model 256 \
     --n-layer 8 \
-    --curriculum \
+    --curriculum --mode-curriculum --fill-curriculum \
     --constraint-weight 0.15 \
     --epochs 60 \
     --target-loss 0.09
@@ -92,7 +98,12 @@ python train_autoregressive.py \
 | `--batch-size` | 128 | Batch size (tensor core saturation) |
 | `--lr` | 3e-4 | Learning rate |
 | `--epochs` | 60 | Training epochs |
-| `--curriculum` | False | Enable 4-stage curriculum |
+| `--curriculum` | False | Enable size curriculum [3-5]→[3-8]→[3-12]→[3-16] |
+| `--mode-curriculum` | False | Enable mode curriculum [STANDARD→ZERO→NEGATIVE] |
+| `--fill-curriculum` | False | Enable fill curriculum [70%→50%→30%→10%] |
+| `--dtype` | fp16 | Precision: fp32, fp16, bf16 |
+| `--grad-checkpoint` | False | Gradient checkpointing (~30% memory savings) |
+| `--profile` | False | Enable torch.profiler for first epoch |
 | `--constraint-weight` | 0.15 | Latin constraint loss weight |
 | `--target-loss` | 0.09 | Early stop target |
 | `--use-8bit` | False | Use 8-bit AdamW (requires bitsandbytes) |

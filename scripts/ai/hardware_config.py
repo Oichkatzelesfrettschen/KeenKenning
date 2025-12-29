@@ -30,11 +30,19 @@ class HardwareProfile:
     """Detected hardware capabilities."""
     # CPU
     cpu_model: str = ""
+    cpu_vendor: str = ""  # "AMD", "Intel", "Unknown"
+    cpu_family: str = ""  # "zen3", "zen4", "alderlake", etc.
     cpu_cores: int = 1
     cpu_threads: int = 1
     has_avx2: bool = False
     has_avx512: bool = False
     has_fma: bool = False
+    has_sha_ni: bool = False
+    has_vaes: bool = False
+
+    # CPU Cache (for 3D V-Cache detection)
+    l3_cache_mb: int = 0
+    has_vcache: bool = False  # 3D V-Cache (L3 >= 64MB on desktop Zen3/4)
 
     # GPU
     gpu_model: str = ""
@@ -52,25 +60,36 @@ class HardwareProfile:
 
 
 def detect_cpu_features() -> Dict[str, Any]:
-    """Detect CPU model and ISA features."""
+    """Detect CPU model, vendor, family, and ISA features."""
     info = {
         "model": "Unknown",
+        "vendor": "Unknown",
+        "family": "unknown",
         "cores": os.cpu_count() or 1,
         "threads": os.cpu_count() or 1,
         "avx2": False,
         "avx512": False,
         "fma": False,
+        "sha_ni": False,
+        "vaes": False,
+        "l3_cache_mb": 0,
+        "has_vcache": False,
     }
 
     try:
         with open("/proc/cpuinfo", "r") as f:
             cpuinfo = f.read()
 
-        # Extract model name
+        # Extract model name and vendor
         for line in cpuinfo.split("\n"):
             if "model name" in line:
                 info["model"] = line.split(":")[1].strip()
-                break
+            elif "vendor_id" in line:
+                vendor_raw = line.split(":")[1].strip()
+                if "AMD" in vendor_raw or "AuthenticAMD" in vendor_raw:
+                    info["vendor"] = "AMD"
+                elif "Intel" in vendor_raw or "GenuineIntel" in vendor_raw:
+                    info["vendor"] = "Intel"
 
         # Check flags
         flags_line = ""
@@ -80,8 +99,10 @@ def detect_cpu_features() -> Dict[str, Any]:
                 break
 
         info["avx2"] = "avx2" in flags_line
-        info["avx512"] = "avx512f" in flags_line or "avx512" in flags_line
+        info["avx512"] = "avx512f" in flags_line
         info["fma"] = "fma" in flags_line
+        info["sha_ni"] = "sha_ni" in flags_line
+        info["vaes"] = "vaes" in flags_line
 
         # Physical cores (Linux)
         try:
@@ -93,10 +114,76 @@ def detect_cpu_features() -> Dict[str, Any]:
         except:
             pass
 
+        # L3 Cache detection (for 3D V-Cache)
+        try:
+            result = subprocess.run(
+                ["lscpu"], capture_output=True, text=True
+            )
+            for line in result.stdout.split("\n"):
+                if "L3 cache:" in line:
+                    cache_str = line.split(":")[1].strip()
+                    # Parse "96 MiB" or "32M" etc.
+                    cache_val = ''.join(c for c in cache_str.split()[0] if c.isdigit())
+                    if cache_val:
+                        info["l3_cache_mb"] = int(cache_val)
+                    break
+        except:
+            pass
+
+        # Determine CPU family
+        info["family"] = _detect_cpu_family(info["vendor"], info["model"], flags_line)
+
+        # 3D V-Cache detection: Desktop Zen3/4 X3D chips have 64+ MB L3
+        if info["vendor"] == "AMD" and info["l3_cache_mb"] >= 64:
+            info["has_vcache"] = True
+
     except Exception as e:
         print(f"CPU detection error: {e}")
 
     return info
+
+
+def _detect_cpu_family(vendor: str, model: str, flags: str) -> str:
+    """Determine CPU microarchitecture family."""
+    model_lower = model.lower()
+
+    if vendor == "AMD":
+        # Zen 4 (Ryzen 7000, EPYC Genoa) - has AVX-512
+        if "7" in model and "ryzen" in model_lower and "avx512" in flags:
+            return "zen4"
+        # Zen 3 (Ryzen 5000, EPYC Milan) - no AVX-512
+        if "5" in model and "ryzen" in model_lower:
+            if "5600x3d" in model_lower or "5800x3d" in model_lower:
+                return "zen3_vcache"  # 3D V-Cache variant
+            return "zen3"
+        # Zen 2 (Ryzen 3000, EPYC Rome)
+        if "3" in model and "ryzen" in model_lower:
+            return "zen2"
+        # Zen+ (Ryzen 2000)
+        if "2" in model and "ryzen" in model_lower:
+            return "zenplus"
+        # EPYC detection
+        if "epyc" in model_lower:
+            if "avx512" in flags:
+                return "zen4"  # Genoa
+            return "zen3"  # Milan/Rome
+        return "zen"  # Generic AMD Zen
+
+    elif vendor == "Intel":
+        # Raptor Lake / Alder Lake (12th/13th/14th gen)
+        if any(x in model_lower for x in ["13th", "14th", "raptor"]):
+            return "raptorlake"
+        if any(x in model_lower for x in ["12th", "alder"]):
+            return "alderlake"
+        # Rocket Lake (11th gen)
+        if "11th" in model_lower:
+            return "rocketlake"
+        # Tiger Lake / Ice Lake
+        if "tiger" in model_lower or "ice" in model_lower:
+            return "icelake"
+        return "intel"  # Generic Intel
+
+    return "unknown"
 
 
 def detect_gpu_features() -> Dict[str, Any]:
@@ -148,11 +235,17 @@ def detect_hardware() -> HardwareProfile:
 
     return HardwareProfile(
         cpu_model=cpu["model"],
+        cpu_vendor=cpu["vendor"],
+        cpu_family=cpu["family"],
         cpu_cores=cpu["cores"],
         cpu_threads=cpu["threads"],
         has_avx2=cpu["avx2"],
         has_avx512=cpu["avx512"],
         has_fma=cpu["fma"],
+        has_sha_ni=cpu["sha_ni"],
+        has_vaes=cpu["vaes"],
+        l3_cache_mb=cpu["l3_cache_mb"],
+        has_vcache=cpu["has_vcache"],
         gpu_model=gpu["model"],
         gpu_memory_gb=gpu["memory_gb"],
         compute_capability=gpu["compute_cap"],
@@ -203,8 +296,19 @@ class TrainingConfig:
     use_torch_compile: bool = True
     compile_mode: str = "default"  # reduce-overhead, max-autotune, default
 
-    # Inductor (CPU)
+    # Inductor (CPU backend)
     inductor_simd: int = 256  # AVX2 = 256, AVX512 = 512
+    inductor_cpp_wrapper: bool = True  # Faster CPU code generation
+
+    # CPU Architecture-specific
+    cpu_march: str = "native"  # GCC -march flag
+    cpu_mtune: str = "native"  # GCC -mtune flag
+    use_onednn: bool = True  # Intel MKL-DNN / oneDNN
+    use_mkl: bool = True  # Intel MKL
+
+    # 3D V-Cache optimization
+    vcache_batch_boost: int = 0  # Extra batch size for V-Cache CPUs
+    vcache_prefetch: bool = False  # Enable aggressive prefetching
 
     # Hardware-specific
     gpu_sm_count: int = 60  # RTX 4070 Ti has 60 SMs
@@ -226,6 +330,35 @@ def get_optimized_config(hw: HardwareProfile) -> TrainingConfig:
     else:
         config.inductor_simd = 128  # SSE fallback
 
+    # CPU architecture-specific flags
+    config.cpu_march, config.cpu_mtune = _get_cpu_march_flags(hw)
+
+    # === AMD Zen3 / V-Cache Optimizations ===
+    if hw.cpu_family in ("zen3", "zen3_vcache"):
+        # Zen3 specific: prefer 256-bit ops (AVX2), avoid 512-bit
+        config.inductor_simd = 256
+        config.use_onednn = True  # oneDNN has Zen3 kernels
+
+        # 3D V-Cache specific optimizations
+        if hw.has_vcache:
+            # With 96MB L3, we can afford larger batches that stay cache-resident
+            config.vcache_batch_boost = 32  # +32 to base batch size
+            config.vcache_prefetch = True
+            # More workers can share L3 cache
+            config.num_workers = min(hw.cpu_threads - 2, 8)
+            config.prefetch_factor = 6  # More aggressive prefetching
+
+    elif hw.cpu_family == "zen4":
+        # Zen4: has AVX-512, use it
+        config.inductor_simd = 512
+        config.cpu_march = "znver4"
+        config.use_onednn = True
+
+    elif hw.cpu_vendor == "Intel":
+        # Intel: use MKL for best performance
+        config.use_mkl = True
+        config.use_onednn = True
+
     # === GPU Optimizations ===
     if hw.compute_capability >= (8, 0):
         # Ampere+ (RTX 30xx, 40xx, A100, etc.)
@@ -242,6 +375,10 @@ def get_optimized_config(hw: HardwareProfile) -> TrainingConfig:
         # Older GPUs
         config.use_amp = False
         config.batch_size = 32
+
+    # Apply V-Cache batch boost
+    if hw.has_vcache and config.vcache_batch_boost > 0:
+        config.batch_size += config.vcache_batch_boost
 
     # Adjust for VRAM
     if hw.gpu_memory_gb < 8:
@@ -267,25 +404,64 @@ def get_optimized_config(hw: HardwareProfile) -> TrainingConfig:
     return config
 
 
+def _get_cpu_march_flags(hw: HardwareProfile) -> tuple:
+    """Get GCC -march and -mtune flags for CPU architecture."""
+    # Map CPU family to GCC architecture names
+    march_map = {
+        "zen4": ("znver4", "znver4"),
+        "zen3": ("znver3", "znver3"),
+        "zen3_vcache": ("znver3", "znver3"),
+        "zen2": ("znver2", "znver2"),
+        "zenplus": ("znver1", "znver1"),
+        "zen": ("znver1", "znver1"),
+        "raptorlake": ("raptorlake", "raptorlake"),
+        "alderlake": ("alderlake", "alderlake"),
+        "rocketlake": ("rocketlake", "rocketlake"),
+        "icelake": ("icelake-client", "icelake-client"),
+        "intel": ("native", "native"),
+    }
+    return march_map.get(hw.cpu_family, ("native", "native"))
+
+
 def apply_optimizations(config: TrainingConfig):
     """Apply hardware optimizations to PyTorch."""
     # TF32 for matmul
     if config.use_tf32 and torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
-        print("✓ TF32 enabled for Tensor Cores")
+        print("TF32 enabled for Tensor Cores")
 
     # cuDNN benchmark
     if torch.cuda.is_available():
         torch.backends.cudnn.benchmark = True
-        print("✓ cuDNN benchmark enabled")
+        print("cuDNN benchmark enabled")
 
     # Set inductor SIMD width for CPU ops
-    os.environ["ATEN_CPU_CAPABILITY"] = f"avx2" if config.inductor_simd <= 256 else "avx512"
+    if config.inductor_simd >= 512:
+        os.environ["ATEN_CPU_CAPABILITY"] = "avx512"
+    elif config.inductor_simd >= 256:
+        os.environ["ATEN_CPU_CAPABILITY"] = "avx2"
+    else:
+        os.environ["ATEN_CPU_CAPABILITY"] = "default"
 
-    # Enable Flash Attention
+    # Inductor C++ wrapper for faster CPU codegen
+    if config.inductor_cpp_wrapper:
+        os.environ["TORCHINDUCTOR_CPP_WRAPPER"] = "1"
+
+    # oneDNN / MKL-DNN
+    if config.use_onednn:
+        os.environ["ONEDNN_VERBOSE"] = "0"  # Disable verbose logging
+        torch.backends.mkldnn.enabled = True
+
+    # V-Cache prefetching optimization
+    if config.vcache_prefetch:
+        # Enable software prefetching in inductor
+        os.environ["TORCHINDUCTOR_FREEZING"] = "1"
+        os.environ["TORCHINDUCTOR_DISABLE_CACHE"] = "0"
+
+    # Flash Attention
     if hasattr(torch.nn.functional, "scaled_dot_product_attention"):
-        print("✓ Flash Attention available")
+        print("Flash Attention available")
 
 
 def print_hardware_report(hw: HardwareProfile, config: TrainingConfig):
@@ -294,8 +470,11 @@ def print_hardware_report(hw: HardwareProfile, config: TrainingConfig):
     print("HARDWARE PROFILE")
     print("=" * 60)
     print(f"CPU:  {hw.cpu_model}")
+    print(f"      Vendor: {hw.cpu_vendor}, Family: {hw.cpu_family}")
     print(f"      {hw.cpu_cores} cores / {hw.cpu_threads} threads")
+    print(f"      L3 Cache: {hw.l3_cache_mb} MB" + (" (3D V-Cache)" if hw.has_vcache else ""))
     print(f"      AVX2: {hw.has_avx2}, AVX512: {hw.has_avx512}, FMA: {hw.has_fma}")
+    print(f"      SHA-NI: {hw.has_sha_ni}, VAES: {hw.has_vaes}")
     print(f"GPU:  {hw.gpu_model}")
     print(f"      {hw.gpu_memory_gb:.1f} GB VRAM, SM {hw.compute_capability[0]}.{hw.compute_capability[1]}")
     print(f"      TensorCores: {hw.has_tensor_cores}, TF32: {hw.has_tf32}, BF16: {hw.has_bf16}, FP8: {hw.has_fp8}")
@@ -304,12 +483,15 @@ def print_hardware_report(hw: HardwareProfile, config: TrainingConfig):
     print("\n" + "-" * 60)
     print("OPTIMIZED CONFIG")
     print("-" * 60)
-    print(f"Batch size:    {config.batch_size}")
+    print(f"Batch size:    {config.batch_size}" + (f" (+{config.vcache_batch_boost} V-Cache boost)" if config.vcache_batch_boost else ""))
     print(f"DataLoader:    {config.num_workers} workers, prefetch={config.prefetch_factor}")
     print(f"Precision:     {'AMP ' + config.amp_dtype if config.use_amp else 'FP32'}, TF32={config.use_tf32}")
     print(f"Optimizer:     {'AdamW8bit' if config.use_8bit_optimizer else 'AdamW'}")
     print(f"Compile:       {config.compile_mode}")
-    print(f"CPU SIMD:      {config.inductor_simd}-bit")
+    print(f"CPU Target:    -march={config.cpu_march} -mtune={config.cpu_mtune}")
+    print(f"CPU SIMD:      {config.inductor_simd}-bit, oneDNN={config.use_onednn}")
+    if hw.has_vcache:
+        print(f"V-Cache:       prefetch={config.vcache_prefetch}, batch_boost=+{config.vcache_batch_boost}")
     print("=" * 60 + "\n")
 
 

@@ -17,6 +17,26 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.profiler import profile, record_function, ProfilerActivity, schedule, tensorboard_trace_handler
+from pathlib import Path
+
+# Checkpoint management for crash-resilient training
+from checkpoint_manager import (
+    CheckpointV2,
+    ModelConfig,
+    OptimizerConfig,
+    SchedulerConfig,
+    TrainingState,
+    RollingCheckpointManager,
+    create_checkpoint_from_training,
+    restore_training_from_checkpoint,
+    load_checkpoint,
+    load_checkpoint_legacy,
+)
+from token_vocabulary import VOCAB, digit_to_token, GameMode
+from mode_transform import transform_standard_to_mode, random_mode_for_size
+from isotopism import random_isotopism
+from curriculum import CurriculumScheduler, SIZE_STAGES, MODE_STAGES, FILL_STAGES
 
 # Hardware-optimized training support
 try:
@@ -31,6 +51,7 @@ try:
     BNB_AVAILABLE = True
 except ImportError:
     BNB_AVAILABLE = False
+from torch.utils.checkpoint import checkpoint as grad_checkpoint
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
 import os
@@ -129,11 +150,29 @@ class MetricsTracker:
 # =============================================================================
 
 class AutoregressiveLatinDataset(Dataset):
-    """Dataset for autoregressive training with variable fill ratios."""
+    """Dataset for autoregressive training with variable fill ratios.
 
-    def __init__(self, data_path, max_size=16, samples_per_grid=None):
+    Supports:
+    - Multi-mode training (STANDARD, ZERO_INCLUSIVE, NEGATIVE)
+    - Isotopism augmentation (row/column/symbol permutations)
+    """
+
+    def __init__(self, data_path, max_size=16, samples_per_grid=None,
+                 multi_mode=False, augment=False):
+        """Initialize dataset.
+
+        Args:
+            data_path: Path to .npz file with Latin squares
+            max_size: Maximum grid size (default 16)
+            samples_per_grid: If set, generate multiple samples per grid
+            multi_mode: If True, randomly select mode for each sample
+            augment: If True, apply random isotopism (row/col/symbol permutation)
+        """
         self.max_size = max_size
         self.samples = []
+        self.multi_mode = multi_mode
+        self.augment = augment
+        self.rng = np.random.default_rng()
 
         if data_path and os.path.exists(data_path):
             data = np.load(data_path)
@@ -149,7 +188,13 @@ class AutoregressiveLatinDataset(Dataset):
                     self.samples.append((grid, size))
 
         self.samples_per_grid = samples_per_grid
-        print(f"Loaded {len(self.samples)} grids from {data_path}")
+        features = []
+        if multi_mode:
+            features.append("multi-mode")
+        if augment:
+            features.append("isotopism")
+        feature_str = f" ({', '.join(features)})" if features else ""
+        print(f"Loaded {len(self.samples)} grids from {data_path}{feature_str}")
 
     def __len__(self):
         if self.samples_per_grid:
@@ -166,23 +211,57 @@ class AutoregressiveLatinDataset(Dataset):
 
         grid, size = self.samples[grid_idx % len(self.samples)]
 
-        padded = np.zeros((self.max_size, self.max_size), dtype=np.int64)
-        padded[:size, :size] = grid
+        # Apply isotopism augmentation (row/col/symbol permutations)
+        if self.augment:
+            # Need to pad grid to max_size for isotopism function
+            padded_for_iso = np.zeros((self.max_size, self.max_size), dtype=grid.dtype)
+            padded_for_iso[:size, :size] = grid
+            padded_for_iso = random_isotopism(padded_for_iso, size, self.rng)
+            grid = padded_for_iso[:size, :size]
+
+        # Select mode (random if multi_mode, otherwise STANDARD)
+        if self.multi_mode:
+            mode = random_mode_for_size(size, self.rng)
+        else:
+            mode = GameMode.STANDARD
+
+        # Transform grid values if not STANDARD mode
+        if mode != GameMode.STANDARD:
+            grid = transform_standard_to_mode(grid, size, mode)
+
+        # Initialize with PAD token for out-of-bounds cells
+        padded = np.full((self.max_size, self.max_size), VOCAB.PAD, dtype=np.int64)
+
+        # Convert raw digit values to tokens
+        for r in range(size):
+            for c in range(size):
+                digit = int(grid[r, c])
+                padded[r, c] = digit_to_token(digit)
 
         if sample_offset is not None:
             fill_ratio = sample_offset / self.samples_per_grid
         else:
             fill_ratio = np.random.uniform(0.0, 0.7)
 
+        # Create input with EMPTY token for masked cells
         mask = np.random.rand(size, size) < fill_ratio
-        inp = np.zeros((self.max_size, self.max_size), dtype=np.int64)
-        inp[:size, :size] = padded[:size, :size] * mask
+        inp = np.full((self.max_size, self.max_size), VOCAB.PAD, dtype=np.int64)
+
+        # Fill in revealed cells (where mask is True) with actual tokens
+        # Fill in masked cells (where mask is False) with EMPTY token
+        for r in range(size):
+            for c in range(size):
+                if mask[r, c]:
+                    inp[r, c] = padded[r, c]  # Revealed: copy token
+                else:
+                    inp[r, c] = VOCAB.EMPTY  # Hidden: EMPTY token
 
         target = torch.from_numpy(padded).long()
         inp_tensor = torch.from_numpy(inp).long()
         size_tensor = torch.tensor(size).long()
+        mode_tensor = torch.tensor(int(mode)).long()
 
-        return inp_tensor, target, size_tensor
+        return inp_tensor, target, size_tensor, mode_tensor
 
 
 class CurriculumDataset(Dataset):
@@ -201,6 +280,98 @@ class CurriculumDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.base[self.indices[idx]]
+
+
+class CurriculumAwareDataset(Dataset):
+    """
+    Multi-dimensional curriculum dataset supporting size, mode, and fill-ratio scheduling.
+
+    Unlike CurriculumDataset which filters at construction time, this wrapper
+    queries the CurriculumScheduler at sample time, allowing dynamic adaptation.
+    """
+
+    def __init__(self, base_dataset, curriculum_scheduler: CurriculumScheduler):
+        """
+        Args:
+            base_dataset: AutoregressiveLatinDataset
+            curriculum_scheduler: CurriculumScheduler instance
+        """
+        self.base = base_dataset
+        self.scheduler = curriculum_scheduler
+        self._rebuild_indices()
+
+    def _rebuild_indices(self):
+        """Rebuild valid indices based on current curriculum state."""
+        allowed_sizes = set(self.scheduler.get_allowed_sizes())
+        self.indices = [
+            i for i, (_, size) in enumerate(self.base.samples)
+            if size in allowed_sizes
+        ]
+
+    def update_for_epoch(self, epoch: int):
+        """Call at start of each epoch to update curriculum state."""
+        old_state = self.scheduler.state
+        self.scheduler.step(epoch)
+        # Rebuild indices only if size stage changed
+        if self.scheduler.state.size_stage != old_state.size_stage:
+            self._rebuild_indices()
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        """Get item with curriculum-aware mode and fill ratio."""
+        base_idx = self.indices[idx]
+        grid, size = self.base.samples[base_idx]
+
+        # Apply isotopism augmentation if enabled
+        if self.base.augment:
+            padded_for_iso = np.zeros((self.base.max_size, self.base.max_size), dtype=grid.dtype)
+            padded_for_iso[:size, :size] = grid
+            padded_for_iso = random_isotopism(padded_for_iso, size, self.base.rng)
+            grid = padded_for_iso[:size, :size]
+
+        # Select mode from allowed modes
+        allowed_modes = self.scheduler.get_allowed_modes()
+        mode_weights = self.scheduler.get_mode_weights()
+        modes = list(mode_weights.keys())
+        weights = [mode_weights[m] for m in modes]
+        mode = self.base.rng.choice(modes, p=weights)
+
+        # Transform grid values if not STANDARD mode
+        if mode != GameMode.STANDARD:
+            grid = transform_standard_to_mode(grid, size, mode)
+
+        # Initialize with PAD token for out-of-bounds cells
+        padded = np.full((self.base.max_size, self.base.max_size), VOCAB.PAD, dtype=np.int64)
+
+        # Convert raw digit values to tokens
+        for r in range(size):
+            for c in range(size):
+                digit = int(grid[r, c])
+                padded[r, c] = digit_to_token(digit)
+
+        # Get fill ratio from current curriculum stage
+        fill_min, fill_max = self.scheduler.get_fill_range()
+        fill_ratio = self.base.rng.uniform(fill_min, fill_max)
+
+        # Create input with EMPTY token for masked cells
+        mask = self.base.rng.random((size, size)) < fill_ratio
+        inp = np.full((self.base.max_size, self.base.max_size), VOCAB.PAD, dtype=np.int64)
+
+        for r in range(size):
+            for c in range(size):
+                if mask[r, c]:
+                    inp[r, c] = padded[r, c]
+                else:
+                    inp[r, c] = VOCAB.EMPTY
+
+        target = torch.from_numpy(padded).long()
+        inp_tensor = torch.from_numpy(inp).long()
+        size_tensor = torch.tensor(size).long()
+        mode_tensor = torch.tensor(int(mode)).long()
+
+        return inp_tensor, target, size_tensor, mode_tensor
 
 
 # =============================================================================
@@ -281,19 +452,27 @@ class MLP(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    """Pre-LN transformer block (nanoGPT style)."""
+    """Pre-LN transformer block (nanoGPT style) with optional gradient checkpointing."""
 
-    def __init__(self, d_model, n_head, dropout=0.1, max_seq_len=256):
+    def __init__(self, d_model, n_head, dropout=0.1, max_seq_len=256, use_checkpoint=False):
         super().__init__()
         self.ln_1 = RMSNorm(d_model)
         self.attn = CausalSelfAttention(d_model, n_head, dropout, max_seq_len)
         self.ln_2 = RMSNorm(d_model)
         self.mlp = MLP(d_model, dropout)
+        self.use_checkpoint = use_checkpoint
 
-    def forward(self, x):
+    def _forward_impl(self, x):
+        """Core forward logic for checkpointing."""
         x = x + self.attn(self.ln_1(x))
         x = x + self.mlp(self.ln_2(x))
         return x
+
+    def forward(self, x):
+        if self.training and self.use_checkpoint:
+            # use_reentrant=False is the new API, more efficient and correct
+            return grad_checkpoint(self._forward_impl, x, use_reentrant=False)
+        return self._forward_impl(x)
 
 
 class ConstraintAwareTransformer(nn.Module):
@@ -306,7 +485,16 @@ class ConstraintAwareTransformer(nn.Module):
     - Constraint-aware output masking
     """
 
-    def __init__(self, max_size=16, num_classes=18, d_model=256, n_head=8, n_layer=8, dropout=0.1):
+    def __init__(self, max_size=16, num_classes=None, d_model=256, n_head=8, n_layer=8,
+                 dropout=0.1, use_checkpoint=False):
+        """
+        Args:
+            use_checkpoint: Enable gradient checkpointing to trade compute for memory.
+                            Reduces memory ~30-50%, increases time ~20-30%.
+        """
+        # Default to unified vocabulary size (35 tokens)
+        if num_classes is None:
+            num_classes = VOCAB.VOCAB_SIZE
         super().__init__()
         self.max_size = max_size
         self.num_classes = num_classes
@@ -318,9 +506,9 @@ class ConstraintAwareTransformer(nn.Module):
         self.size_emb = nn.Embedding(max_size + 1, d_model)
         self.drop = nn.Dropout(dropout)
 
-        # Transformer blocks
+        # Transformer blocks with optional gradient checkpointing
         self.blocks = nn.ModuleList([
-            TransformerBlock(d_model, n_head, dropout, max_seq_len)
+            TransformerBlock(d_model, n_head, dropout, max_seq_len, use_checkpoint=use_checkpoint)
             for _ in range(n_layer)
         ])
 
@@ -401,8 +589,12 @@ class ConstraintAwareLoss(nn.Module):
 
         for b in range(B):
             size = sizes[b].item()
-            # Extract valid region: digits 1 to size
-            p = probs[b, 1:size+1, :size, :size]  # [size, size, size]
+            # Extract valid region: digits 1 to size (STANDARD mode)
+            # With unified vocabulary: digit d -> token (VAL_OFFSET_POSITIVE + d)
+            # So digit 1 -> token 3, digit size -> token (2 + size)
+            start_token = VOCAB.VAL_OFFSET_POSITIVE + 1  # Token for digit 1
+            end_token = VOCAB.VAL_OFFSET_POSITIVE + size + 1  # Token for digit size + 1
+            p = probs[b, start_token:end_token, :size, :size]  # [size, size, size]
 
             # Row constraint: each digit should appear ~once per row
             row_sums = p.sum(dim=2)  # [size, size] - sum over columns
@@ -421,23 +613,54 @@ class ConstraintAwareLoss(nn.Module):
 
 
 # =============================================================================
+# MEMORY MONITORING (P4.3)
+# =============================================================================
+
+def get_gpu_memory_mb():
+    """Get current and peak GPU memory usage in MB."""
+    if not torch.cuda.is_available():
+        return {"allocated": 0, "reserved": 0, "peak": 0}
+
+    return {
+        "allocated": torch.cuda.memory_allocated() / 1024 / 1024,
+        "reserved": torch.cuda.memory_reserved() / 1024 / 1024,
+        "peak": torch.cuda.max_memory_allocated() / 1024 / 1024,
+    }
+
+
+def reset_peak_memory():
+    """Reset peak memory stats for per-epoch measurement."""
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
+
+
+# =============================================================================
 # TRAINING FUNCTIONS
 # =============================================================================
 
-def train_epoch(model, loader, optimizer, criterion, scaler, device, grad_clip=1.0):
+def train_epoch(model, loader, optimizer, criterion, scaler, device, grad_clip=1.0,
+                use_amp=True, train_dtype=torch.float16, profiler=None):
+    """Train for one epoch with optional mixed precision.
+
+    Args:
+        use_amp: Whether to use automatic mixed precision
+        train_dtype: Dtype for autocast (torch.float16 or torch.bfloat16)
+        profiler: Optional torch.profiler for performance analysis
+    """
     model.train()
     total_loss, total_ce, total_cst = 0.0, 0.0, 0.0
     n_batches = 0
 
-    for i, (inp, target, size) in enumerate(loader):
+    for i, (inp, target, size, mode) in enumerate(loader):
         inp = inp.to(device)
         target = target.to(device)
         size = size.to(device)
+        mode = mode.to(device)  # For future mode-conditioned training
 
         optimizer.zero_grad(set_to_none=True)
 
-        with torch.amp.autocast('cuda', enabled=scaler is not None):
-            logits = model(inp, size)
+        with torch.amp.autocast('cuda', enabled=use_amp, dtype=train_dtype):
+            logits = model(inp, size)  # TODO: pass mode when model supports it
             loss, ce, cst = criterion(logits, target, size)
 
         if scaler:
@@ -459,6 +682,10 @@ def train_epoch(model, loader, optimizer, criterion, scaler, device, grad_clip=1
         if i % 500 == 0:
             print(f"  [{i:5d}] loss={loss.item():.4f} ce={ce.item():.4f} cst={cst.item():.4f}", flush=True)
 
+        # P4.3.3: Step profiler (for first epoch profiling)
+        if profiler is not None:
+            profiler.step()
+
     return {
         'loss': total_loss / n_batches,
         'ce': total_ce / n_batches,
@@ -466,20 +693,24 @@ def train_epoch(model, loader, optimizer, criterion, scaler, device, grad_clip=1
     }
 
 
-def validate_model(model, loader, criterion, device, tracker):
+def validate_model(model, loader, criterion, device, tracker,
+                   use_amp=True, train_dtype=torch.float16):
+    """Validate model with optional mixed precision."""
     model.train(False)  # Set to inference mode
     tracker.reset()
     total_loss = 0.0
     n_batches = 0
 
     with torch.no_grad():
-        for inp, target, size in loader:
+        for inp, target, size, mode in loader:
             inp = inp.to(device)
             target = target.to(device)
             size = size.to(device)
+            mode = mode.to(device)  # For future mode-conditioned validation
 
-            logits = model(inp, size)
-            loss, _, _ = criterion(logits, target, size)
+            with torch.amp.autocast('cuda', enabled=use_amp, dtype=train_dtype):
+                logits = model(inp, size)  # TODO: pass mode when model supports it
+                loss, _, _ = criterion(logits, target, size)
             total_loss += loss.item()
             n_batches += 1
 
@@ -534,13 +765,27 @@ def main():
     parser.add_argument("--d-model", type=int, default=256)  # Multiple of 8 for tensor cores
     parser.add_argument("--n-layer", type=int, default=8)
     parser.add_argument("--constraint-weight", type=float, default=0.15)
-    parser.add_argument("--curriculum", action="store_true", help="Enable curriculum learning")
+    parser.add_argument("--curriculum", action="store_true", help="Enable size curriculum (3-5 → 3-16)")
+    parser.add_argument("--mode-curriculum", action="store_true", help="Enable mode curriculum (STANDARD → ALL)")
+    parser.add_argument("--fill-curriculum", action="store_true", help="Enable fill curriculum (70%% → 0%%)")
+    parser.add_argument("--multi-mode", action="store_true", help="Enable multi-mode training (STANDARD/ZERO/NEGATIVE)")
+    parser.add_argument("--augment", action="store_true", help="Enable isotopism augmentation (row/col/symbol permutation)")
     parser.add_argument("--target-loss", type=float, default=0.09)
     # Hardware optimization args
+    parser.add_argument("--dtype", choices=["fp32", "fp16", "bf16"], default="fp16",
+                        help="Training dtype: fp32 (no AMP), fp16 (default), bf16 (better stability on Ampere+)")
+    parser.add_argument("--grad-checkpoint", action="store_true",
+                        help="Enable gradient checkpointing (saves ~30%% memory, costs ~20%% speed)")
     parser.add_argument("--use-8bit", action="store_true", help="Use 8-bit AdamW (requires bitsandbytes)")
     parser.add_argument("--prefetch", type=int, default=4, help="DataLoader prefetch factor")
     parser.add_argument("--num-workers", type=int, default=6, help="DataLoader workers (use ~half CPU cores)")
     parser.add_argument("--hw-report", action="store_true", help="Print hardware detection report")
+    parser.add_argument("--profile", action="store_true",
+                        help="Enable torch.profiler for first epoch (outputs to ./profile_traces/)")
+    # Checkpoint and resume args
+    parser.add_argument("--resume", type=str, default=None, help="Resume from checkpoint path")
+    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints", help="Checkpoint directory")
+    parser.add_argument("--keep-checkpoints", type=int, default=3, help="Number of rolling checkpoints to keep")
     args = parser.parse_args()
 
     # Hardware detection and report
@@ -567,7 +812,9 @@ def main():
         print(f"TF32 + cuDNN benchmark enabled")
 
     # Dataset
-    full_ds = AutoregressiveLatinDataset(args.data, max_size=16)
+    full_ds = AutoregressiveLatinDataset(
+        args.data, max_size=16, multi_mode=args.multi_mode, augment=args.augment
+    )
     train_n = int(0.9 * len(full_ds))
     val_n = len(full_ds) - train_n
     train_ds, val_ds = torch.utils.data.random_split(full_ds, [train_n, val_n])
@@ -578,14 +825,53 @@ def main():
         prefetch_factor=args.prefetch  # CPU prefetches ahead while GPU computes
     )
 
-    # Model
+    # Model (using unified 35-token vocabulary)
     model = ConstraintAwareTransformer(
-        max_size=16, num_classes=18,
-        d_model=args.d_model, n_head=8, n_layer=args.n_layer, dropout=0.1
+        max_size=16, num_classes=VOCAB.VOCAB_SIZE,
+        d_model=args.d_model, n_head=8, n_layer=args.n_layer, dropout=0.1,
+        use_checkpoint=args.grad_checkpoint
     ).to(device)
+
+    if args.grad_checkpoint:
+        print("Gradient checkpointing: enabled (saves ~30% memory, costs ~20% speed)")
 
     n_params = sum(p.numel() for p in model.parameters())
     print(f"Parameters: {n_params:,}")
+
+    # Create configuration objects for checkpoint serialization
+    model_config = ModelConfig(
+        vocab_size=VOCAB.VOCAB_SIZE,  # 35 tokens (PAD, EMPTY, values -16 to +16)
+        d_model=args.d_model,
+        n_head=8,
+        n_layer=args.n_layer,
+        d_ff=args.d_model * 4,
+        max_size=16,
+        num_modes=11,
+        dropout=0.1,
+        use_checkpoint=args.grad_checkpoint,  # P4.2: Gradient checkpointing
+    )
+    optimizer_config = OptimizerConfig(
+        name="AdamW8bit" if (args.use_8bit and BNB_AVAILABLE) else "AdamW",
+        lr=args.lr,
+        weight_decay=0.1,
+        betas=(0.9, 0.95),
+        use_8bit=args.use_8bit and BNB_AVAILABLE,
+        dtype=args.dtype,  # P4.1.4: Serialize dtype in checkpoint
+    )
+    scheduler_config = SchedulerConfig(
+        name="LambdaLR",
+        warmup_epochs=3,
+        min_lr=args.lr * 0.1,
+    )
+
+    # Initialize checkpoint manager
+    checkpoint_manager = RollingCheckpointManager(
+        checkpoint_dir=Path(args.checkpoint_dir),
+        prefix=Path(args.output).stem,
+        keep_last_n=args.keep_checkpoints,
+        keep_best=True,
+    )
+    training_state = TrainingState()
 
     if hasattr(torch, 'compile'):
         # Use 'default' mode - 'reduce-overhead' triggers SM warnings on GPUs < 80 SMs
@@ -615,7 +901,8 @@ def main():
             weight_decay=0.1    # 10x stronger than before
         )
         if args.use_8bit and not BNB_AVAILABLE:
-            print("Optimizer: AdamW (8-bit requested but bitsandbytes not installed)")
+            print("Optimizer: AdamW (WARNING: 8-bit requested but bitsandbytes not available)")
+            print("  Install with: pip install bitsandbytes (saves ~40% optimizer memory)")
         else:
             print("Optimizer: AdamW")
 
@@ -631,41 +918,113 @@ def main():
         return min_lr_ratio + (1.0 - min_lr_ratio) * coeff
 
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_fn)
-    scaler = torch.amp.GradScaler('cuda') if device.type == 'cuda' else None
+
+    # Precision configuration
+    # - FP16: requires GradScaler due to narrow dynamic range (5-bit exponent)
+    # - BF16: same exponent as FP32 (8-bit), no scaler needed, better stability
+    # - FP32: no AMP, no scaler
+    DTYPE_MAP = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
+    train_dtype = DTYPE_MAP[args.dtype]
+    use_amp = args.dtype != "fp32" and device.type == "cuda"
+    # Only FP16 needs GradScaler (BF16 has same exponent range as FP32)
+    scaler = torch.amp.GradScaler('cuda') if (args.dtype == "fp16" and device.type == "cuda") else None
+
+    print(f"Precision: {args.dtype.upper()} (AMP={'enabled' if use_amp else 'disabled'}, GradScaler={'enabled' if scaler else 'disabled'})")
+
+    # P4.3.3: Profiler setup
+    profiler = None
+    if args.profile and device.type == "cuda":
+        profile_dir = Path("profile_traces")
+        profile_dir.mkdir(exist_ok=True)
+        profiler = profile(
+            activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+            schedule=schedule(wait=1, warmup=1, active=3, repeat=1),
+            on_trace_ready=tensorboard_trace_handler(str(profile_dir)),
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True
+        )
+        print(f"Profiler: enabled (output: {profile_dir}/)")
+
     tracker = MetricsTracker()
 
-    best_loss = float('inf')
-    target_met = False
+    # Resume from checkpoint if specified
+    start_epoch = 0
+    if args.resume:
+        resume_path = Path(args.resume)
+        if resume_path.exists():
+            try:
+                # Try loading as CheckpointV2
+                checkpoint = load_checkpoint(resume_path)
+                training_state = restore_training_from_checkpoint(
+                    checkpoint,
+                    model._orig_mod if hasattr(model, '_orig_mod') else model,
+                    optimizer,
+                    scheduler,
+                    scaler,
+                    restore_rng=True,
+                )
+                start_epoch = training_state.epoch + 1
+                print(f"Resumed from checkpoint: epoch {training_state.epoch}, "
+                      f"best_loss={training_state.best_loss:.4f}")
+            except (KeyError, RuntimeError) as e:
+                # Fall back to legacy checkpoint (model weights only)
+                print(f"Loading legacy checkpoint (weights only): {e}")
+                legacy = load_checkpoint_legacy(resume_path)
+                base_model = model._orig_mod if hasattr(model, '_orig_mod') else model
+                base_model.load_state_dict(legacy['model_state_dict'])
+                print(f"Loaded legacy weights from {resume_path}")
+        else:
+            print(f"Warning: Checkpoint not found at {resume_path}, starting fresh")
 
-    # Curriculum stages
-    curriculum = [
-        [3, 4, 5],
-        [3, 4, 5, 6, 7, 8],
-        [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        list(range(3, 17))
-    ]
-    stage = 0
-    stage_epochs = args.epochs // len(curriculum) if args.curriculum else args.epochs
+    best_loss = training_state.best_loss
+    target_met = best_loss < args.target_loss
+
+    # Multi-dimensional curriculum scheduler
+    use_curriculum = args.curriculum or args.mode_curriculum or args.fill_curriculum
+    curriculum_scheduler = None
+    if use_curriculum:
+        # Try to restore from checkpoint if available
+        if training_state.curriculum_scheduler_state:
+            curriculum_scheduler = CurriculumScheduler.from_dict(
+                training_state.curriculum_scheduler_state
+            )
+            print(f"Restored curriculum from checkpoint: {curriculum_scheduler.describe()}")
+        else:
+            curriculum_scheduler = CurriculumScheduler(
+                total_epochs=args.epochs,
+                enable_size=args.curriculum,
+                enable_mode=args.mode_curriculum,
+                enable_fill=args.fill_curriculum,
+            )
+            print(f"Curriculum enabled: size={args.curriculum}, mode={args.mode_curriculum}, fill={args.fill_curriculum}")
+
+    # Create curriculum-aware dataset if any curriculum is enabled
+    if curriculum_scheduler:
+        curriculum_ds = CurriculumAwareDataset(full_ds, curriculum_scheduler)
+        # Get indices for train split
+        train_indices = [i for i in range(len(curriculum_ds)) if curriculum_ds.indices[i] < train_n]
 
     print(f"\n{'='*60}")
     print(f"Training Start - Target: loss < {args.target_loss}")
+    if start_epoch > 0:
+        print(f"Resuming from epoch {start_epoch}")
     print(f"{'='*60}\n")
 
-    for epoch in range(args.epochs):
-        # Curriculum update
-        if args.curriculum:
-            new_stage = min(epoch // stage_epochs, len(curriculum) - 1)
-            if new_stage != stage:
-                stage = new_stage
-                print(f"\n>>> Curriculum Stage {stage+1}: sizes {curriculum[stage]}")
+    prev_curriculum_desc = None
+    for epoch in range(start_epoch, args.epochs):
+        # Update curriculum state and rebuild loader if needed
+        if curriculum_scheduler:
+            curriculum_ds.update_for_epoch(epoch)
+            curr_desc = curriculum_scheduler.describe()
+            if curr_desc != prev_curriculum_desc:
+                print(f"\n>>> {curr_desc}")
+                prev_curriculum_desc = curr_desc
+                # Rebuild train indices after size stage change
+                train_indices = [i for i in range(len(curriculum_ds)) if curriculum_ds.indices[i] < train_n]
 
-        # Build train loader
-        if args.curriculum:
-            curr_ds = CurriculumDataset(full_ds, curriculum[stage])
-            # Only use indices that are in train split
-            curr_indices = [i for i in range(len(curr_ds)) if curr_ds.indices[i] < train_n]
             train_loader = DataLoader(
-                torch.utils.data.Subset(curr_ds, curr_indices),
+                torch.utils.data.Subset(curriculum_ds, train_indices),
                 batch_size=args.batch_size, shuffle=True,
                 num_workers=args.num_workers, pin_memory=True, persistent_workers=True,
                 prefetch_factor=args.prefetch
@@ -681,11 +1040,24 @@ def main():
         print(f"\nEpoch {epoch+1}/{args.epochs} (lr={lr:.6f})")
         print("-" * 40)
 
-        # Train
-        train_m = train_epoch(model, train_loader, optimizer, criterion, scaler, device)
+        # Reset peak memory for per-epoch measurement
+        reset_peak_memory()
+
+        # Train (with optional profiling on first epoch)
+        epoch_profiler = profiler if (epoch == start_epoch and profiler is not None) else None
+        if epoch_profiler:
+            epoch_profiler.start()
+
+        train_m = train_epoch(model, train_loader, optimizer, criterion, scaler, device,
+                              use_amp=use_amp, train_dtype=train_dtype, profiler=epoch_profiler)
+
+        if epoch_profiler:
+            epoch_profiler.stop()
+            print(f"  Profiler trace saved to profile_traces/")
 
         # Validate
-        val_m = validate_model(model, val_loader, criterion, device, tracker)
+        val_m = validate_model(model, val_loader, criterion, device, tracker,
+                               use_amp=use_amp, train_dtype=train_dtype)
 
         # Test empty generation
         gen_rate = test_empty_generation(model, 9, device, 50)
@@ -702,11 +1074,42 @@ def main():
         print(f"  Gen Entropy:       {val_m['generation_entropy']:.2f} bits")
         print(f"  Empty->Valid 9x9:  {gen_rate*100:.1f}%")
 
-        # Save best
-        if val_m['loss'] < best_loss:
+        # P4.3: Memory monitoring
+        if device.type == "cuda":
+            mem = get_gpu_memory_mb()
+            print(f"  Peak GPU Memory:   {mem['peak']:.0f} MB")
+
+        # Update training state and save checkpoint
+        is_best = val_m['loss'] < best_loss
+        if is_best:
             best_loss = val_m['loss']
-            torch.save(model.state_dict(), f"{args.output}_best.pth")
-            print(f"  >> Saved best (loss={best_loss:.4f})")
+
+        training_state.update_on_epoch_end(epoch, val_m['loss'], val_m['valid_grid_rate'])
+
+        # Save curriculum state (P5.4)
+        if curriculum_scheduler:
+            training_state.curriculum_stage = curriculum_scheduler.state.size_stage.value  # Legacy compat
+            training_state.curriculum_scheduler_state = curriculum_scheduler.to_dict()
+        else:
+            training_state.curriculum_stage = 0
+
+        # Create and save full checkpoint
+        base_model = model._orig_mod if hasattr(model, '_orig_mod') else model
+        checkpoint = create_checkpoint_from_training(
+            model=base_model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            training_state=training_state,
+            model_config=model_config,
+            optimizer_config=optimizer_config,
+            scheduler_config=scheduler_config,
+            scaler=scaler,
+            include_rng=True,
+        )
+        checkpoint_manager.save(checkpoint, is_best=is_best)
+
+        if is_best:
+            print(f"  >> Saved best checkpoint (loss={best_loss:.4f})")
 
         if val_m['loss'] < args.target_loss and not target_met:
             target_met = True
@@ -714,17 +1117,28 @@ def main():
             print(f"TARGET MET: {val_m['loss']:.4f} < {args.target_loss}")
             print(f"{'*'*60}\n")
 
-    # Final save
-    torch.save(model.state_dict(), f"{args.output}.pth")
+    # Final checkpoint is already saved in the loop
+    print(f"\nCheckpoints saved to: {args.checkpoint_dir}/")
+    print(f"  Latest: {checkpoint_manager.get_latest_path()}")
+    print(f"  Best:   {checkpoint_manager.get_best_path()}")
 
-    # ONNX export
-    print("\nExporting ONNX...")
-    model.train(False)
+    # Also save legacy .pth for backward compatibility
+    base_model = model._orig_mod if hasattr(model, '_orig_mod') else model
+    torch.save(base_model.state_dict(), f"{args.output}.pth")
+    print(f"  Legacy: {args.output}.pth")
 
-    # Get base model if compiled
-    export_model = model._orig_mod if hasattr(model, '_orig_mod') else model
+    # ONNX export (from best checkpoint)
+    print("\nExporting ONNX from best checkpoint...")
+    best_ckpt = checkpoint_manager.load_best()
+    if best_ckpt and best_ckpt.model_state_dict:
+        base_model.load_state_dict(best_ckpt.model_state_dict)
+        print(f"  Loaded best weights (loss={best_ckpt.training_state.best_loss:.4f})")
 
-    dummy_grid = torch.zeros(1, 16, 16, dtype=torch.long, device=device)
+    base_model.train(False)
+    export_model = base_model
+
+    # Use EMPTY tokens for inference input (cells to predict)
+    dummy_grid = torch.full((1, 16, 16), VOCAB.EMPTY, dtype=torch.long, device=device)
     dummy_size = torch.tensor([9], dtype=torch.long, device=device)
 
     torch.onnx.export(

@@ -67,22 +67,53 @@ latin_gen_opt: $(SOURCES)
 
 # --- AI Training Pipeline ---
 
-.PHONY: generate-data train deploy-model ai-pipeline full-pipeline
+.PHONY: generate-data generate-data-cuda train train-full train-quick train-resume
+.PHONY: deploy-model ai-pipeline full-pipeline hw-report
 
 TRAIN_COUNT ?= 10000
+TRAIN_EPOCHS ?= 60
+TARGET_LOSS ?= 0.09
 ASSETS_DIR = app/src/main/assets
 MODEL_NAME = latin_solver.onnx
 
-generate-data: tools ## Generate Latin square training data (3x3 to 9x9)
+# Data generation
+generate-data: tools ## Generate Latin square training data (CPU, 3x3 to 9x9)
 	@echo "Generating $(TRAIN_COUNT) grids per size (3x3 to 9x9)..."
 	cd $(AI_DIR) && python generate_data.py --count $(TRAIN_COUNT)
 
-train: generate-data ## Train the neural model and export to ONNX (depends on data)
-	@echo "Training model on generated data..."
-	cd $(AI_DIR) && python train_massive_model.py
-	@echo "Model exported to $(AI_DIR)/$(MODEL_NAME)"
+generate-data-cuda: ## Generate massive training data (GPU, 3x3 to 16x16)
+	@echo "Generating $(TRAIN_COUNT) grids per size (3x3 to 16x16) with CUDA..."
+	cd $(AI_DIR) && python generate_data_cuda.py --full --count $(TRAIN_COUNT)
 
-deploy-model: train ## Copy trained ONNX model to Android assets (depends on training)
+# Training targets
+train: ## Train with autoregressive model (production, all curriculum)
+	@echo "Training autoregressive model with full curriculum..."
+	cd $(AI_DIR) && python train_autoregressive.py \
+		--curriculum --mode-curriculum --fill-curriculum \
+		--epochs $(TRAIN_EPOCHS) --target-loss $(TARGET_LOSS)
+
+train-full: ## Full training with all optimizations
+	@echo "Full training: curriculum + augmentation..."
+	cd $(AI_DIR) && python train_autoregressive.py \
+		--curriculum --mode-curriculum --fill-curriculum \
+		--augment --multi-mode \
+		--epochs $(TRAIN_EPOCHS) --target-loss $(TARGET_LOSS)
+
+train-quick: ## Quick test training (5 epochs, no curriculum)
+	cd $(AI_DIR) && python train_autoregressive.py --epochs 5 --batch-size 64
+
+train-resume: ## Resume training from latest checkpoint
+	cd $(AI_DIR) && python train_autoregressive.py \
+		--curriculum --mode-curriculum --fill-curriculum \
+		--resume checkpoints/latest.pt \
+		--epochs $(TRAIN_EPOCHS) --target-loss $(TARGET_LOSS)
+
+# Hardware report
+hw-report: ## Print hardware detection and optimizations
+	cd $(AI_DIR) && python hardware_config.py
+
+# Deployment
+deploy-model: ## Copy trained ONNX model to Android assets
 	@if [ -f "$(AI_DIR)/$(MODEL_NAME)" ]; then \
 		cp $(AI_DIR)/$(MODEL_NAME) $(ASSETS_DIR)/$(MODEL_NAME); \
 		echo "Deployed $(MODEL_NAME) to assets"; \
@@ -95,7 +126,7 @@ deploy-model: train ## Copy trained ONNX model to Android assets (depends on tra
 		echo "Deployed $(MODEL_NAME).data to assets"; \
 	fi
 
-ai-pipeline: deploy-model ## Full AI pipeline: generate data, train, deploy
+ai-pipeline: generate-data-cuda train deploy-model ## Full AI pipeline: generate data, train, deploy
 	@echo "AI pipeline complete. Model ready in assets."
 
 full-pipeline: deploy-model ## Complete build: AI pipeline + Android APK
