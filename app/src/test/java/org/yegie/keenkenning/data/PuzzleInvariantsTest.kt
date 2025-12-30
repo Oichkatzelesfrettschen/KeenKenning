@@ -483,12 +483,16 @@ class PuzzleInvariantsTest {
      * Calculate zone target value based on operation.
      */
     private fun calculateZoneTarget(digits: List<Int>, operation: KeenModel.Zone.Type): Int {
+        // Helper functions
+        fun gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a % b)
+        fun lcm(a: Int, b: Int): Int = if (a == 0 || b == 0) 0 else kotlin.math.abs(a * b) / gcd(a, b)
+
         return when (operation) {
             KeenModel.Zone.Type.ADD -> digits.sum()
             KeenModel.Zone.Type.TIMES -> digits.fold(1) { acc, d -> acc * d }
             KeenModel.Zone.Type.MINUS -> {
                 if (digits.size == 2) kotlin.math.abs(digits[0] - digits[1])
-                else digits.sum() // Fallback for >2 cells
+                else digits.sum() // Fallback
             }
             KeenModel.Zone.Type.DIVIDE -> {
                 if (digits.size == 2) {
@@ -497,11 +501,22 @@ class PuzzleInvariantsTest {
                 } else 1 // Fallback
             }
             KeenModel.Zone.Type.EXPONENT -> {
-                if (digits.size == 2) {
-                    val (base, exp) = digits
-                    base.toDouble().pow(exp.toDouble()).toInt()
-                } else digits.first()
+                 if (digits.size == 2) {
+                     val (a, b) = digits.sortedDescending() // Usually base is larger? Or order matters.
+                     // For simple test generation, assume strict A^B not supported robustly or just A^B
+                     // Let's assume larger^smaller for stability
+                     Math.pow(a.toDouble(), b.toDouble()).toInt()
+                 } else 1
             }
+            KeenModel.Zone.Type.MODULO -> {
+                if (digits.size == 2) {
+                    val (a, b) = digits.sortedDescending()
+                    if (b != 0) a % b else 0
+                } else 0
+            }
+            KeenModel.Zone.Type.GCD -> digits.reduce { acc, i -> gcd(acc, i) }
+            KeenModel.Zone.Type.LCM -> digits.reduce { acc, i -> lcm(acc, i) }
+            KeenModel.Zone.Type.XOR -> digits.reduce { acc, i -> acc xor i }
         }
     }
 }

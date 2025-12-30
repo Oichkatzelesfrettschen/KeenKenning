@@ -58,6 +58,12 @@ class SaveManager(context: Context) {
         private const val KEY_TIME_PREFIX = "slot_time_"
         private const val KEY_ELAPSED_PREFIX = "slot_elapsed_"
         private const val KEY_SOLVED_PREFIX = "slot_solved_"
+        
+        // Auto-save keys for implicit persistence
+        private const val KEY_AUTOSAVE_MODEL = "autosave_model"
+        private const val KEY_AUTOSAVE_ELAPSED = "autosave_elapsed"
+        private const val KEY_AUTOSAVE_TIMESTAMP = "autosave_timestamp"
+        private const val KEY_AUTOSAVE_DIFF_NAME = "autosave_diff_name"
     }
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -140,6 +146,52 @@ class SaveManager(context: Context) {
             e.printStackTrace()
             null to 0
         }
+    }
+
+    /**
+     * Auto-save the current game state (implicit persistence)
+     */
+    fun saveAutoSave(
+        model: KeenModel,
+        difficultyName: String,
+        elapsedSeconds: Long
+    ) {
+        try {
+            val modelJson = gson.toJson(model, KeenModel::class.java)
+            prefs.edit()
+                .putString(KEY_AUTOSAVE_MODEL, modelJson)
+                .putString(KEY_AUTOSAVE_DIFF_NAME, difficultyName)
+                .putLong(KEY_AUTOSAVE_TIMESTAMP, System.currentTimeMillis())
+                .putLong(KEY_AUTOSAVE_ELAPSED, elapsedSeconds)
+                .apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * Load the auto-saved game state
+     */
+    fun loadAutoSave(): Pair<KeenModel?, Long> {
+        val modelJson = prefs.getString(KEY_AUTOSAVE_MODEL, null)
+        if (modelJson.isNullOrEmpty()) return null to 0
+
+        return try {
+            val model = gson.fromJson(modelJson, KeenModel::class.java)
+            model.ensureInitialized()
+            val elapsed = prefs.getLong(KEY_AUTOSAVE_ELAPSED, 0)
+            model to elapsed
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null to 0
+        }
+    }
+
+    /**
+     * Check if an auto-save exists
+     */
+    fun hasAutoSave(): Boolean {
+        return prefs.contains(KEY_AUTOSAVE_MODEL)
     }
 
     /**

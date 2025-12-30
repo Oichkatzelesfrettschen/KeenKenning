@@ -28,18 +28,18 @@
 #ifndef KEENKENNING_KEEN_H
 #define KEENKENNING_KEEN_H
 
+#include "keen_modes.h"
 #include "latin.h"
 #include "puzzles.h"
-#include "keen_modes.h"
 
 struct game_params {
     int w, diff, multiplication_only;
-    int mode_flags;  /* Bit flags from kenken_modes.h for extended modes */
+    int mode_flags; /* Bit flags from kenken_modes.h for extended modes */
 };
 
-char *new_game_desc(const game_params *params, random_state *rs, char **aux, int interactive);
+char* new_game_desc(const game_params* params, random_state* rs, char** aux, int interactive);
 
-char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit *input_grid,
-                              char **aux, int interactive);
+char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit* input_grid,
+                              char** aux, int interactive);
 
-#endif // KEENKENNING_KEEN_H
+#endif  // KEENKENNING_KEEN_H

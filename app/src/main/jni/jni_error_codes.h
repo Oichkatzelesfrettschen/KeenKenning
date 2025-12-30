@@ -21,15 +21,15 @@
 #define JNI_PREFIX_ERR "ERR:"
 
 /* Error codes - must match JniErrorCode enum in Kotlin */
-#define JNI_ERR_NONE             0
-#define JNI_ERR_GRID_SIZE        1  /* Grid size mismatch */
-#define JNI_ERR_INVALID_GRID     2  /* AI grid rejected (not valid Latin square) */
-#define JNI_ERR_GENERATION_FAIL  3  /* Native generation returned NULL */
-#define JNI_ERR_MEMORY           4  /* Memory allocation failed */
-#define JNI_ERR_INVALID_PARAMS   5  /* Invalid parameters (size, diff, etc.) */
-#define JNI_ERR_CLUE_GENERATION  6  /* Failed to generate valid clues */
-#define JNI_ERR_INVALID_MODES    7  /* Incompatible mode flags */
-#define JNI_ERR_SIZE_LIMIT       8  /* Grid size too large for mode */
+#define JNI_ERR_NONE 0
+#define JNI_ERR_GRID_SIZE 1       /* Grid size mismatch */
+#define JNI_ERR_INVALID_GRID 2    /* AI grid rejected (not valid Latin square) */
+#define JNI_ERR_GENERATION_FAIL 3 /* Native generation returned NULL */
+#define JNI_ERR_MEMORY 4          /* Memory allocation failed */
+#define JNI_ERR_INVALID_PARAMS 5  /* Invalid parameters (size, diff, etc.) */
+#define JNI_ERR_CLUE_GENERATION 6 /* Failed to generate valid clues */
+#define JNI_ERR_INVALID_MODES 7   /* Incompatible mode flags */
+#define JNI_ERR_SIZE_LIMIT 8      /* Grid size too large for mode */
 
 /* Helper macro for error string formatting */
 #define JNI_ERR_FMT "ERR:%d:%s"

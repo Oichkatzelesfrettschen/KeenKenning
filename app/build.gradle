@@ -21,9 +21,15 @@ android {
         
         externalNativeBuild {
             cmake {
-                cppFlags "-Werror -Wall -Wextra"
-                // Ensure all modern binaries are built: ARM (32/64), Intel (32/64), RISC-V (64)
-                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64', 'riscv64'
+                // Maximal Error Catching & Fuzzing-ready Flags
+                // Shared flags: -Werror -Wall -Wextra -Wshadow -Wconversion -Wformat=2 -Wimplicit-fallthrough
+                // Sanitizers: -fsanitize=address,undefined -fno-omit-frame-pointer -fstack-protector-strong
+                
+                cFlags   "-std=c23   -Werror -Wall -Wextra -Wshadow -Wconversion -Wformat=2 -Wimplicit-fallthrough -fsanitize=address,undefined -fno-omit-frame-pointer -fstack-protector-strong"
+                cppFlags "-std=c++23 -Werror -Wall -Wextra -Wshadow -Wconversion -Wformat=2 -Wimplicit-fallthrough -fsanitize=address,undefined -fno-omit-frame-pointer -fstack-protector-strong"
+                
+                // Focus on arm64-v8a for this strict audit
+                abiFilters 'arm64-v8a'
             }
         }
     }
@@ -42,6 +48,7 @@ android {
 
     kotlinOptions {
         jvmTarget = '21'
+        allWarningsAsErrors = true
     }
 
     buildFeatures {

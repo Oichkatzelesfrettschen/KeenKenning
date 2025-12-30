@@ -10,10 +10,12 @@
  */
 
 #include "keen_validate.h"
-#include "keen_modes.h"
-#include "puzzles.h"  /* For smalloc, sfree */
-#include "latin.h"    /* For digit type */
+
 #include <string.h>
+
+#include "keen_modes.h"
+#include "latin.h"   /* For digit type */
+#include "puzzles.h" /* For smalloc, sfree */
 
 /* Maximum cage size - must match kenken.c */
 #define MAXBLK 6
@@ -30,7 +32,7 @@
 #define CMASK 0xE0000000L
 
 /* Forward declaration for dsf_canonify from dsf.c */
-extern int dsf_canonify(int *dsf, int index);
+extern int dsf_canonify(int* dsf, int index);
 
 /*
  * GCD helper using Euclidean algorithm.
@@ -57,15 +59,15 @@ static long lcm(long a, long b) {
  * Check a single row for duplicates.
  * Returns bitmask of cell indices within the row that have duplicates.
  */
-static int check_row_duplicates(const validate_ctx *ctx, int row, int *errors) {
+static int check_row_duplicates(const validate_ctx* ctx, int row, int* errors) {
     int w = ctx->w;
-    int seen[17] = {0};  /* seen[digit] = first occurrence index + 1, or 0 if unseen */
+    int seen[17] = {0}; /* seen[digit] = first occurrence index + 1, or 0 if unseen */
     int count = 0;
 
     for (int col = 0; col < w; col++) {
         int cell = row * w + col;
         digit d = ctx->grid[cell];
-        if (d == 0) continue;  /* Empty cell */
+        if (d == 0) continue; /* Empty cell */
 
         if (seen[d]) {
             /* Duplicate found - mark both cells */
@@ -74,7 +76,7 @@ static int check_row_duplicates(const validate_ctx *ctx, int row, int *errors) {
             errors[cell] |= VALID_ERR_ROW;
             count++;
         } else {
-            seen[d] = col + 1;  /* Store column + 1 (so 0 means unseen) */
+            seen[d] = col + 1; /* Store column + 1 (so 0 means unseen) */
         }
     }
     return count;
@@ -83,7 +85,7 @@ static int check_row_duplicates(const validate_ctx *ctx, int row, int *errors) {
 /*
  * Check a single column for duplicates.
  */
-static int check_col_duplicates(const validate_ctx *ctx, int col, int *errors) {
+static int check_col_duplicates(const validate_ctx* ctx, int col, int* errors) {
     int w = ctx->w;
     int seen[17] = {0};
     int count = 0;
@@ -109,8 +111,8 @@ static int check_col_duplicates(const validate_ctx *ctx, int col, int *errors) {
  * Collect all cells belonging to a cage and their values.
  * Returns number of filled cells (-1 if cage is incomplete).
  */
-static int collect_cage(const validate_ctx *ctx, int root,
-                        int *cells, digit *values, int *total_cells) {
+static int collect_cage(const validate_ctx* ctx, int root, int* cells, digit* values,
+                        int* total_cells) {
     int w = ctx->w;
     int n = w * w;
     int filled = 0;
@@ -132,8 +134,7 @@ static int collect_cage(const validate_ctx *ctx, int root,
  * Only called when all cells in the cage are filled.
  * Returns 1 if satisfied, 0 if violated.
  */
-static int check_cage_constraint(const validate_ctx *ctx, int root,
-                                  digit *values, int ncells) {
+static int check_cage_constraint(const validate_ctx* ctx, int root, digit* values, int ncells) {
     long clue = ctx->clues[root];
     long target = clue & ~CMASK;
     long op = clue & CMASK;
@@ -144,7 +145,7 @@ static int check_cage_constraint(const validate_ctx *ctx, int root,
         int seen = 0;
         for (i = 0; i < ncells; i++) {
             int bit = 1 << values[i];
-            if (seen & bit) return 0;  /* Duplicate in cage */
+            if (seen & bit) return 0; /* Duplicate in cage */
             seen |= bit;
         }
     }
@@ -174,7 +175,11 @@ static int check_cage_constraint(const validate_ctx *ctx, int root,
             /* 2-cell only: max/min = target (exact division) */
             if (ncells != 2) return 0;
             long a = values[0], b = values[1];
-            if (a < b) { long t = a; a = b; b = t; }
+            if (a < b) {
+                long t = a;
+                a = b;
+                b = t;
+            }
             if (b == 0) return 0;
             return (a % b == 0) && (a / b == target);
         }
@@ -207,26 +212,26 @@ static int check_cage_constraint(const validate_ctx *ctx, int root,
             long l = values[0];
             for (i = 1; i < ncells; i++) {
                 l = lcm(l, values[i]);
-                if (l > 10000000) return 0;  /* Overflow protection */
+                if (l > 10000000) return 0; /* Overflow protection */
             }
             return l == target;
         }
 
         default:
-            return 1;  /* Unknown op - assume valid */
+            return 1; /* Unknown op - assume valid */
     }
 }
 
 /*
  * Validate entire grid.
  */
-int kenken_validate_grid(const validate_ctx *ctx, int *errors) {
+int kenken_validate_grid(const validate_ctx* ctx, int* errors) {
     int w = ctx->w;
     int n = w * w;
     int row, col, i;
 
     /* Clear error array */
-    memset(errors, 0, n * sizeof(int));
+    memset(errors, 0, (size_t)n * sizeof(int));
 
     /* Check rows */
     for (row = 0; row < w; row++) {
@@ -239,8 +244,8 @@ int kenken_validate_grid(const validate_ctx *ctx, int *errors) {
     }
 
     /* Check cages - only fully filled ones */
-    int *checked = (int *)smalloc(n * sizeof(int));
-    memset(checked, 0, n * sizeof(int));
+    int* checked = (int*)smalloc((size_t)n * sizeof(int));
+    memset(checked, 0, (size_t)n * sizeof(int));
 
     digit values[MAXBLK + 1];
     int cells[MAXBLK + 1];
@@ -278,14 +283,14 @@ int kenken_validate_grid(const validate_ctx *ctx, int *errors) {
 /*
  * Validate a single cell (for incremental updates).
  */
-int kenken_validate_cell(const validate_ctx *ctx, int cell) {
+int kenken_validate_cell(const validate_ctx* ctx, int cell) {
     int w = ctx->w;
     int row = cell / w;
     int col = cell % w;
     int result = VALID_OK;
     digit d = ctx->grid[cell];
 
-    if (d == 0) return VALID_OK;  /* Empty cell has no errors */
+    if (d == 0) return VALID_OK; /* Empty cell has no errors */
 
     /* Check row */
     for (int c = 0; c < w; c++) {
@@ -323,7 +328,7 @@ int kenken_validate_cell(const validate_ctx *ctx, int cell) {
 /*
  * Check if puzzle is complete and valid.
  */
-int kenken_is_complete(const validate_ctx *ctx) {
+int kenken_is_complete(const validate_ctx* ctx) {
     int w = ctx->w;
     int n = w * w;
 
@@ -333,10 +338,9 @@ int kenken_is_complete(const validate_ctx *ctx) {
     }
 
     /* Validate entire grid */
-    int *errors = (int *)smalloc(n * sizeof(int));
+    int* errors = (int*)smalloc((size_t)n * sizeof(int));
     int error_count = kenken_validate_grid(ctx, errors);
     sfree(errors);
 
     return error_count == 0;
 }
-

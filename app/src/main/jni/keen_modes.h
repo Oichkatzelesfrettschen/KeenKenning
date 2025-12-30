@@ -25,30 +25,30 @@
 #define KENKEN_MODES_H
 
 /* Phase 1: Basic variants (low effort) */
-#define MODE_STANDARD          0x0000  /* Default: all ops, digits 1-N */
-#define MODE_MULT_ONLY         0x0001  /* Multiplication only (existing) */
-#define MODE_MYSTERY           0x0002  /* UI-only: hide operation symbols */
-#define MODE_ZERO_INCLUSIVE    0x0004  /* Digits 0 to N-1 instead of 1 to N */
+#define MODE_STANDARD 0x0000       /* Default: all ops, digits 1-N */
+#define MODE_MULT_ONLY 0x0001      /* Multiplication only (existing) */
+#define MODE_MYSTERY 0x0002        /* UI-only: hide operation symbols */
+#define MODE_ZERO_INCLUSIVE 0x0004 /* Digits 0 to N-1 instead of 1 to N */
 
 /* Phase 2: Extended operations (medium effort) */
-#define MODE_EXPONENT          0x0010  /* Include ^ exponent operation */
-#define MODE_NEGATIVE          0x0008  /* Range -N to +N (excluding 0) */
-#define MODE_BITWISE           0x0800  /* Enable XOR, AND, OR operations (high ambiguity) */
+#define MODE_EXPONENT 0x0010 /* Include ^ exponent operation */
+#define MODE_NEGATIVE 0x0008 /* Range -N to +N (excluding 0) */
+#define MODE_BITWISE 0x0800  /* Enable XOR, AND, OR operations (high ambiguity) */
 
 /* Phase 3: Advanced constraints (high effort) */
-#define MODE_MODULAR           0x0020  /* Wrap-around arithmetic (mod N) */
-#define MODE_KILLER            0x0040  /* No repeated digits in cages */
+#define MODE_MODULAR 0x0020 /* Wrap-around arithmetic (mod N) */
+#define MODE_KILLER 0x0040  /* No repeated digits in cages */
 
 /* Phase 4: Research-backed innovations */
-#define MODE_HINT              0x0080  /* Explainable hints with reasoning */
-#define MODE_ADAPTIVE          0x0100  /* Difficulty adjusts to skill */
-#define MODE_STORY             0x0200  /* Themed puzzles with narrative */
-#define MODE_NUMBER_THEORY     0x0400  /* GCD, LCM, MOD operations */
+#define MODE_HINT 0x0080          /* Explainable hints with reasoning */
+#define MODE_ADAPTIVE 0x0100      /* Difficulty adjusts to skill */
+#define MODE_STORY 0x0200         /* Themed puzzles with narrative */
+#define MODE_NUMBER_THEORY 0x0400 /* GCD, LCM, MOD operations */
 
 /* Utility macros */
-#define HAS_MODE(flags, mode)  (((flags) & (mode)) != 0)
-#define SET_MODE(flags, mode)  ((flags) | (mode))
-#define CLR_MODE(flags, mode)  ((flags) & ~(mode))
+#define HAS_MODE(flags, mode) (((flags) & (mode)) != 0)
+#define SET_MODE(flags, mode) ((flags) | (mode))
+#define CLR_MODE(flags, mode) ((flags) & ~(mode))
 
 /*
  * Mode compatibility matrix:
@@ -84,16 +84,16 @@ static inline int validate_mode_flags(int flags) {
  * Get digit range for a given mode and grid size.
  * Returns: min_digit (via pointer), max_digit (return value)
  */
-static inline int get_digit_range(int flags, int w, int *min_digit) {
+static inline int get_digit_range(int flags, int w, int* min_digit) {
     if (HAS_MODE(flags, MODE_NEGATIVE)) {
         *min_digit = -w;
-        return w;  /* Range: -N to +N, excluding 0 */
+        return w; /* Range: -N to +N, excluding 0 */
     } else if (HAS_MODE(flags, MODE_ZERO_INCLUSIVE)) {
         *min_digit = 0;
-        return w - 1;  /* Range: 0 to N-1 */
+        return w - 1; /* Range: 0 to N-1 */
     } else {
         *min_digit = 1;
-        return w;  /* Standard: 1 to N */
+        return w; /* Standard: 1 to N */
     }
 }
 

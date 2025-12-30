@@ -45,6 +45,8 @@
  * SOFTWARE.
  */
 
+#include "keen.h"
+
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
@@ -52,7 +54,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "keen.h"
 #include "latin.h"
 #include "puzzles.h"
 
@@ -60,20 +61,20 @@
  * Difficulty levels: X-macro pattern ensures the enum values and
  * their string representations stay synchronized automatically.
  */
-#define DIFFLIST(A)                                                                                \
-    A(EASY, Easy, solver_easy, e)                                                                  \
-    A(NORMAL, Normal, solver_normal, n)                                                            \
-    A(HARD, Hard, solver_hard, h)                                                                  \
-    A(EXTREME, Extreme, solver_extreme, x)                                                         \
-    A(UNREASONABLE, Unreasonable, solver_unreasonable, u)                                          \
-    A(LUDICROUS, Ludicrous, solver_ludicrous, l)                                                   \
+#define DIFFLIST(A)                                       \
+    A(EASY, Easy, solver_easy, e)                         \
+    A(NORMAL, Normal, solver_normal, n)                   \
+    A(HARD, Hard, solver_hard, h)                         \
+    A(EXTREME, Extreme, solver_extreme, x)                \
+    A(UNREASONABLE, Unreasonable, solver_unreasonable, u) \
+    A(LUDICROUS, Ludicrous, solver_ludicrous, l)          \
     A(INCOMPREHENSIBLE, Incomprehensible, solver_incomprehensible, i)
 #define ENUM(upper, title, func, lower) DIFF_##upper,
 #define TITLE(upper, title, func, lower) #title,
 #define ENCODE(upper, title, func, lower) #lower
 #define CONFIG(upper, title, func, lower) ":" #title
 enum { DIFFLIST(ENUM) DIFFCOUNT };
-static char const *const keen_diffnames[] = {DIFFLIST(TITLE)};
+static char const* const keen_diffnames[] = {DIFFLIST(TITLE)};
 static char const keen_diffchars[] = DIFFLIST(ENCODE);
 #define DIFFCONFIG DIFFLIST(CONFIG)
 
@@ -106,16 +107,16 @@ static char const keen_diffchars[] = DIFFLIST(ENCODE);
 #define C_MUL 0x20000000L
 #define C_SUB 0x40000000L
 #define C_DIV 0x60000000L
-#define C_EXP 0x80000000L  /* Exponentiation: a^b (requires MODE_EXPONENT) */
-#define C_MOD 0xA0000000L  /* Modulo: a % b = clue (requires MODE_NUMBER_THEORY) */
-#define C_GCD 0xC0000000L  /* GCD of all digits (requires MODE_NUMBER_THEORY) */
-#define C_LCM 0xE0000000L  /* LCM of all digits (requires MODE_NUMBER_THEORY) */
+#define C_EXP 0x80000000L /* Exponentiation: a^b (requires MODE_EXPONENT) */
+#define C_MOD 0xA0000000L /* Modulo: a % b = clue (requires MODE_NUMBER_THEORY) */
+#define C_GCD 0xC0000000L /* GCD of all digits (requires MODE_NUMBER_THEORY) */
+#define C_LCM 0xE0000000L /* LCM of all digits (requires MODE_NUMBER_THEORY) */
 /* Extended bitwise operations (odd slots) */
-#define C_XOR 0x10000000L  /* XOR of all digits (requires MODE_BITWISE) */
-#define C_AND 0x30000000L  /* AND of all digits (reserved, requires MODE_BITWISE) */
-#define C_OR  0x50000000L  /* OR of all digits (reserved, requires MODE_BITWISE) */
-#define CMASK 0xF0000000L  /* 4 bits for 16 operations (backward compatible) */
-#define CUNIT 0x10000000L  /* Unit step for operation codes */
+#define C_XOR 0x10000000L /* XOR of all digits (requires MODE_BITWISE) */
+#define C_AND 0x30000000L /* AND of all digits (reserved, requires MODE_BITWISE) */
+#define C_OR 0x50000000L  /* OR of all digits (reserved, requires MODE_BITWISE) */
+#define CMASK 0xF0000000L /* 4 bits for 16 operations (backward compatible) */
+#define CUNIT 0x10000000L /* Unit step for operation codes */
 
 /*
  * Helper functions for number theory operations.
@@ -132,25 +133,25 @@ static long gcd_helper(long a, long b) {
 static long lcm_helper(long a, long b) {
     if (a == 0 || b == 0) return 0;
     long g = gcd_helper(a, b);
-    return (a / g) * b;  /* Avoid overflow by dividing first */
+    return (a / g) * b; /* Avoid overflow by dividing first */
 }
 
-static long gcd_array(digit *arr, int n) {
+static long gcd_array(digit* arr, int n) {
     if (n == 0) return 0;
     long result = arr[0];
     for (int i = 1; i < n; i++) {
         result = gcd_helper(result, arr[i]);
-        if (result == 1) return 1;  /* Early exit: GCD can't go lower */
+        if (result == 1) return 1; /* Early exit: GCD can't go lower */
     }
     return result;
 }
 
-static long lcm_array(digit *arr, int n) {
+static long lcm_array(digit* arr, int n) {
     if (n == 0) return 0;
     long result = arr[0];
     for (int i = 1; i < n; i++) {
         result = lcm_helper(result, arr[i]);
-        if (result > 1000000) return result;  /* Prevent overflow */
+        if (result > 1000000) return result; /* Prevent overflow */
     }
     return result;
 }
@@ -167,8 +168,8 @@ static long lcm_array(digit *arr, int n) {
  * products of large cages: e.g., 9^16 = 1.85e15 fits in 64 bits.
  */
 #define MAXBLK_STANDARD 6
-#define MAXBLK_KILLER   16
-#define MAXBLK          MAXBLK_STANDARD  /* Legacy compatibility */
+#define MAXBLK_KILLER 16
+#define MAXBLK MAXBLK_STANDARD /* Legacy compatibility */
 
 /*
  * Get effective max block size based on mode AND difficulty.
@@ -186,16 +187,16 @@ static inline int get_maxblk_for_diff(int mode_flags, int diff) {
         return MAXBLK_KILLER;
     }
     if (diff >= DIFF_UNREASONABLE) {
-        return 10;  /* Large cages for very hard puzzles */
+        return 10; /* Large cages for very hard puzzles */
     }
     if (diff >= DIFF_HARD) {
-        return 8;   /* Medium-large cages for hard puzzles */
+        return 8; /* Medium-large cages for hard puzzles */
     }
     return MAXBLK_STANDARD;
 }
 
 /* Legacy wrapper for mode-only queries */
-static inline int get_maxblk(int mode_flags) {
+[[maybe_unused]] static inline int get_maxblk(int mode_flags) {
     return get_maxblk_for_diff(mode_flags, DIFF_NORMAL);
 }
 
@@ -205,9 +206,9 @@ static inline int get_maxblk(int mode_flags) {
  */
 static inline int get_minblk(int mode_flags) {
     if (HAS_MODE(mode_flags, MODE_KILLER)) {
-        return 2;  /* Killer mode: minimum 2 cells per cage */
+        return 2; /* Killer mode: minimum 2 cells per cage */
     }
-    return 1;  /* Standard: allow singletons */
+    return 1; /* Standard: allow singletons */
 }
 
 enum { COL_BACKGROUND, COL_GRID, COL_USER, COL_HIGHLIGHT, COL_ERROR, COL_PENCIL, NCOLOURS };
@@ -215,45 +216,41 @@ enum { COL_BACKGROUND, COL_GRID, COL_USER, COL_HIGHLIGHT, COL_ERROR, COL_PENCIL,
 struct clues {
     int refcount;
     int w;
-    int *dsf;
-    long *clues;
+    int* dsf;
+    long* clues;
 };
 
 struct game_state {
     game_params par;
-    struct clues *clues;
-    digit *grid;
-    int *pencil; /* bitmaps using bits 1<<1..1<<n */
+    struct clues* clues;
+    digit* grid;
+    int* pencil; /* bitmaps using bits 1<<1..1<<n */
     int completed, cheated;
 };
 
-static game_params *default_params(void) {
-    game_params *ret = snew(game_params);
+[[maybe_unused]] static game_params* default_params(void) {
+    game_params* ret = snew(game_params);
 
     ret->w = 6;
     ret->diff = DIFF_NORMAL;
-    ret->multiplication_only = FALSE;
+    ret->multiplication_only = false;
     ret->mode_flags = MODE_STANDARD;
 
     return ret;
 }
 
 const static struct game_params keen_presets[] = {
-    {3, DIFF_EASY, FALSE, MODE_STANDARD},
-    {4, DIFF_EASY, FALSE, MODE_STANDARD},
-    {5, DIFF_NORMAL, FALSE, MODE_STANDARD},
-    {6, DIFF_NORMAL, FALSE, MODE_STANDARD},
-    {7, DIFF_HARD, FALSE, MODE_STANDARD},
-    {8, DIFF_EXTREME, FALSE, MODE_STANDARD},
-    {9, DIFF_UNREASONABLE, FALSE, MODE_STANDARD},
+    {3, DIFF_EASY, false, MODE_STANDARD},         {4, DIFF_EASY, false, MODE_STANDARD},
+    {5, DIFF_NORMAL, false, MODE_STANDARD},       {6, DIFF_NORMAL, false, MODE_STANDARD},
+    {7, DIFF_HARD, false, MODE_STANDARD},         {8, DIFF_EXTREME, false, MODE_STANDARD},
+    {9, DIFF_UNREASONABLE, false, MODE_STANDARD},
 };
 
-static int game_fetch_preset(int i, char **name, game_params **params) {
-    game_params *ret;
+[[maybe_unused]] static int game_fetch_preset(int i, char** name, game_params** params) {
+    game_params* ret;
     char buf[80];
 
-    if (i < 0 || i >= lenof(keen_presets))
-        return FALSE;
+    if (i < 0 || (size_t)i >= lenof(keen_presets)) return false;
 
     ret = snew(game_params);
     *ret = keen_presets[i]; /* structure copy */
@@ -263,25 +260,24 @@ static int game_fetch_preset(int i, char **name, game_params **params) {
 
     *name = dupstr(buf);
     *params = ret;
-    return TRUE;
+    return true;
 }
 
-static void free_params(game_params *params) {
+[[maybe_unused]] static void free_params(game_params* params) {
     sfree(params);
 }
 
-static game_params *dup_params(const game_params *params) {
-    game_params *ret = snew(game_params);
+[[maybe_unused]] static game_params* dup_params(const game_params* params) {
+    game_params* ret = snew(game_params);
     *ret = *params; /* structure copy */
     return ret;
 }
 
-static void decode_params(game_params *params, char const *string) {
-    char const *p = string;
+[[maybe_unused]] static void decode_params(game_params* params, char const* string) {
+    char const* p = string;
 
     params->w = atoi(p);
-    while (*p && isdigit((unsigned char)*p))
-        p++;
+    while (*p && isdigit((unsigned char)*p)) p++;
 
     if (*p == 'd') {
         int i;
@@ -289,8 +285,7 @@ static void decode_params(game_params *params, char const *string) {
         params->diff = DIFFCOUNT + 1; /* ...which is invalid */
         if (*p) {
             for (i = 0; i < DIFFCOUNT; i++) {
-                if (*p == keen_diffchars[i])
-                    params->diff = i;
+                if (*p == keen_diffchars[i]) params->diff = i;
             }
             p++;
         }
@@ -298,11 +293,11 @@ static void decode_params(game_params *params, char const *string) {
 
     if (*p == 'm') {
         p++;
-        params->multiplication_only = TRUE;
+        params->multiplication_only = true;
     }
 }
 
-static char *encode_params(const game_params *params, int full) {
+[[maybe_unused]] static char* encode_params(const game_params* params, int full) {
     char ret[80];
 
     sprintf(ret, "%d", params->w);
@@ -313,8 +308,8 @@ static char *encode_params(const game_params *params, int full) {
     return dupstr(ret);
 }
 
-static config_item *game_configure(const game_params *params) {
-    config_item *ret;
+[[maybe_unused]] static config_item* game_configure(const game_params* params) {
+    config_item* ret;
     char buf[80];
 
     ret = snewn(4, config_item);
@@ -332,19 +327,19 @@ static config_item *game_configure(const game_params *params) {
 
     ret[2].name = "Multiplication only";
     ret[2].type = C_BOOLEAN;
-    ret[2].sval = NULL;
+    ret[2].sval = nullptr;
     ret[2].ival = params->multiplication_only;
 
-    ret[3].name = NULL;
+    ret[3].name = nullptr;
     ret[3].type = C_END;
-    ret[3].sval = NULL;
+    ret[3].sval = nullptr;
     ret[3].ival = 0;
 
     return ret;
 }
 
-static game_params *custom_params(const config_item *cfg) {
-    game_params *ret = snew(game_params);
+[[maybe_unused]] static game_params* custom_params(const config_item* cfg) {
+    game_params* ret = snew(game_params);
 
     ret->w = atoi(cfg[0].sval);
     ret->diff = cfg[1].ival;
@@ -354,12 +349,10 @@ static game_params *custom_params(const config_item *cfg) {
     return ret;
 }
 
-static char *validate_params(const game_params *params, int full) {
-    if (params->w < 3 || params->w > 16)
-        return "Grid size must be between 3 and 16";
-    if (params->diff >= DIFFCOUNT)
-        return "Unknown difficulty rating";
-    return NULL;
+[[maybe_unused]] static char* validate_params(const game_params* params, [[maybe_unused]] int full) {
+    if (params->w < 3 || params->w > 16) return "Grid size must be between 3 and 16";
+    if (params->diff >= DIFFCOUNT) return "Unknown difficulty rating";
+    return nullptr;
 }
 
 /* ----------------------------------------------------------------------
@@ -370,14 +363,14 @@ struct solver_ctx {
     int w, diff;
     int nboxes;
     int *boxes, *boxlist, *whichbox;
-    long *clues;
-    digit *soln;
-    digit *dscratch;
-    int *iscratch;
-    int mode_flags;  /* Mode flags for Killer, Modular, etc. */
+    long* clues;
+    digit* soln;
+    digit* dscratch;
+    int* iscratch;
+    int mode_flags; /* Mode flags for Killer, Modular, etc. */
 };
 
-static void solver_clue_candidate(struct solver_ctx *ctx, int diff, int box) {
+static void solver_clue_candidate(struct solver_ctx* ctx, int diff, int box) {
     int w = ctx->w;
     int n = ctx->boxes[box + 1] - ctx->boxes[box];
     int j;
@@ -389,8 +382,7 @@ static void solver_clue_candidate(struct solver_ctx *ctx, int diff, int box) {
         int seen = 0;
         for (j = 0; j < n; j++) {
             int bit = 1 << ctx->dscratch[j];
-            if (seen & bit)
-                return;  /* Duplicate found, reject this candidate */
+            if (seen & bit) return; /* Duplicate found, reject this candidate */
             seen |= bit;
         }
     }
@@ -441,17 +433,14 @@ static void solver_clue_candidate(struct solver_ctx *ctx, int diff, int box) {
          * all the values in dscratch and OR them all into
          * everywhere.
          */
-        for (j = 0; j < n; j++)
-            mask |= 1 << ctx->dscratch[j];
-        for (j = 0; j < n; j++)
-            ctx->iscratch[j] |= mask;
+        for (j = 0; j < n; j++) mask |= 1 << ctx->dscratch[j];
+        for (j = 0; j < n; j++) ctx->iscratch[j] |= mask;
     } else if (diff == DIFF_NORMAL) {
         /*
          * Normal-mode deductions: we process the information in
          * dscratch in the obvious way.
          */
-        for (j = 0; j < n; j++)
-            ctx->iscratch[j] |= 1 << ctx->dscratch[j];
+        for (j = 0; j < n; j++) ctx->iscratch[j] |= 1 << ctx->dscratch[j];
     } else if (diff == DIFF_HARD) {
         /*
          * Hard-mode deductions: instead of ruling things out
@@ -460,22 +449,20 @@ static void solver_clue_candidate(struct solver_ctx *ctx, int diff, int box) {
          * them out of all squares in that row or column that
          * _aren't_ part of this clue box.
          */
-        int *sq = ctx->boxlist + ctx->boxes[box];
+        int* sq = ctx->boxlist + ctx->boxes[box];
 
-        for (j = 0; j < 2 * w; j++)
-            ctx->iscratch[2 * w + j] = 0;
+        for (j = 0; j < 2 * w; j++) ctx->iscratch[2 * w + j] = 0;
         for (j = 0; j < n; j++) {
             int x = sq[j] / w, y = sq[j] % w;
             ctx->iscratch[2 * w + x] |= 1 << ctx->dscratch[j];
             ctx->iscratch[3 * w + y] |= 1 << ctx->dscratch[j];
         }
-        for (j = 0; j < 2 * w; j++)
-            ctx->iscratch[j] &= ctx->iscratch[2 * w + j];
+        for (j = 0; j < 2 * w; j++) ctx->iscratch[j] &= ctx->iscratch[2 * w + j];
     }
 }
 
-static int solver_common(struct latin_solver *solver, void *vctx, int diff) {
-    struct solver_ctx *ctx = (struct solver_ctx *)vctx;
+static int solver_common(struct latin_solver* solver, void* vctx, int diff) {
+    struct solver_ctx* ctx = (struct solver_ctx*)vctx;
     int w = ctx->w;
     int box, i, j, k;
     int ret = 0, total;
@@ -484,7 +471,7 @@ static int solver_common(struct latin_solver *solver, void *vctx, int diff) {
      * Iterate over each clue box and deduce what we can.
      */
     for (box = 0; box < ctx->nboxes; box++) {
-        int *sq = ctx->boxlist + ctx->boxes[box];
+        int* sq = ctx->boxlist + ctx->boxes[box];
         int n = ctx->boxes[box + 1] - ctx->boxes[box];
         long value = ctx->clues[box] & ~CMASK;
         long op = ctx->clues[box] & CMASK;
@@ -496,317 +483,300 @@ static int solver_common(struct latin_solver *solver, void *vctx, int diff) {
          * solver_clue_candidate explaining what each version does.
          */
         if (diff == DIFF_HARD) {
-            for (i = 0; i < 2 * w; i++)
-                ctx->iscratch[i] = (1 << (w + 1)) - (1 << 1);
+            for (i = 0; i < 2 * w; i++) ctx->iscratch[i] = (1 << (w + 1)) - (1 << 1);
         } else {
-            for (i = 0; i < n; i++)
-                ctx->iscratch[i] = 0;
+            for (i = 0; i < n; i++) ctx->iscratch[i] = 0;
         }
 
         switch (op) {
-        case C_SUB:
-        case C_DIV:
-            /*
-             * These two clue types must always apply to a box of
-             * area 2. Also, the two digits in these boxes can never
-             * be the same (because any domino must have its two
-             * squares in either the same row or the same column).
-             * So we simply iterate over all possibilities for the
-             * two squares (both ways round), rule out any which are
-             * inconsistent with the digit constraints we already
-             * have, and update the digit constraints with any new
-             * information thus garnered.
-             */
-            assert(n == 2);
+            case C_SUB:
+            case C_DIV:
+                /*
+                 * These two clue types must always apply to a box of
+                 * area 2. Also, the two digits in these boxes can never
+                 * be the same (because any domino must have its two
+                 * squares in either the same row or the same column).
+                 * So we simply iterate over all possibilities for the
+                 * two squares (both ways round), rule out any which are
+                 * inconsistent with the digit constraints we already
+                 * have, and update the digit constraints with any new
+                 * information thus garnered.
+                 */
+                assert(n == 2);
 
-            for (i = 1; i <= w; i++) {
-                j = (op == C_SUB ? i + value : i * value);
-                if (j > w)
-                    break;
+                for (i = 1; i <= w; i++) {
+                    j = (int)((op == C_SUB ? i + value : i * value));
+                    if (j > w) break;
 
-                /* (i,j) is a valid digit pair. Try it both ways round. */
+                    /* (i,j) is a valid digit pair. Try it both ways round. */
 
-                if (solver->cube[sq[0] * w + i - 1] && solver->cube[sq[1] * w + j - 1]) {
-                    ctx->dscratch[0] = i;
-                    ctx->dscratch[1] = j;
-                    solver_clue_candidate(ctx, diff, box);
-                }
-
-                if (solver->cube[sq[0] * w + j - 1] && solver->cube[sq[1] * w + i - 1]) {
-                    ctx->dscratch[0] = j;
-                    ctx->dscratch[1] = i;
-                    solver_clue_candidate(ctx, diff, box);
-                }
-            }
-
-            break;
-
-        case C_EXP:
-            /*
-             * Exponentiation: base^exp = value. Only for 2-cell boxes.
-             * Find all (base, exp) pairs where base^exp == clue value.
-             * Convention: smaller digit is base, larger is exponent.
-             */
-            assert(n == 2);
-
-            for (i = 1; i <= w; i++) {
-                for (j = i + 1; j <= w; j++) {
-                    /* Check if i^j == value */
-                    long result = 1;
-                    int e;
-                    for (e = 0; e < j; e++) {
-                        result *= i;
-                        if (result > value)
-                            break;  /* Early exit for overflow */
-                    }
-                    if (result != value)
-                        continue;
-
-                    /* (i,j) is base^exp = value. Try both cell orderings. */
                     if (solver->cube[sq[0] * w + i - 1] && solver->cube[sq[1] * w + j - 1]) {
-                        ctx->dscratch[0] = i;
-                        ctx->dscratch[1] = j;
+                        ctx->dscratch[0] = (digit)i;
+                        ctx->dscratch[1] = (digit)j;
                         solver_clue_candidate(ctx, diff, box);
                     }
 
                     if (solver->cube[sq[0] * w + j - 1] && solver->cube[sq[1] * w + i - 1]) {
-                        ctx->dscratch[0] = j;
-                        ctx->dscratch[1] = i;
+                        ctx->dscratch[0] = (digit)j;
+                        ctx->dscratch[1] = (digit)i;
                         solver_clue_candidate(ctx, diff, box);
                     }
                 }
-            }
 
-            break;
+                break;
 
-        case C_ADD:
-        case C_MUL:
-            /*
-             * Addition and multiplication cages require exhaustive
-             * enumeration of all valid digit combinations.
-             *
-             * Rather than recursive function calls, we use iterative
-             * enumeration via the scratch array. The index i tracks
-             * which cell in the cage is currently being incremented.
-             */
-            i = 0;
-            ctx->dscratch[i] = 0;
-            total = value; /* start with the identity */
-            while (1) {
-                if (i < n) {
-                    /*
-                     * Find the next valid value for cell i.
-                     */
-                    for (j = ctx->dscratch[i] + 1; j <= w; j++) {
-                        if (op == C_ADD ? (total < j) : (total % j != 0))
-                            continue; /* this one won't fit */
-                        if (!solver->cube[sq[i] * w + j - 1])
-                            continue; /* this one is ruled out already */
-                        for (k = 0; k < i; k++)
-                            if (ctx->dscratch[k] == j &&
-                                (sq[k] % w == sq[i] % w || sq[k] / w == sq[i] / w))
-                                break; /* clashes with another row/col */
-                        if (k < i)
-                            continue;
+            case C_EXP:
+                /*
+                 * Exponentiation: base^exp = value. Only for 2-cell boxes.
+                 * Find all (base, exp) pairs where base^exp == clue value.
+                 * Convention: smaller digit is base, larger is exponent.
+                 */
+                assert(n == 2);
 
-                        /* Found one. */
-                        break;
+                for (i = 1; i <= w; i++) {
+                    for (j = i + 1; j <= w; j++) {
+                        /* Check if i^j == value */
+                        long result = 1;
+                        int e;
+                        for (e = 0; e < j; e++) {
+                            result *= i;
+                            if (result > value) break; /* Early exit for overflow */
+                        }
+                        if (result != value) continue;
+
+                        /* (i,j) is base^exp = value. Try both cell orderings. */
+                        if (solver->cube[sq[0] * w + i - 1] && solver->cube[sq[1] * w + j - 1]) {
+                            ctx->dscratch[0] = (digit)i;
+                            ctx->dscratch[1] = (digit)j;
+                            solver_clue_candidate(ctx, diff, box);
+                        }
+
+                        if (solver->cube[sq[0] * w + j - 1] && solver->cube[sq[1] * w + i - 1]) {
+                            ctx->dscratch[0] = (digit)j;
+                            ctx->dscratch[1] = (digit)i;
+                            solver_clue_candidate(ctx, diff, box);
+                        }
                     }
+                }
 
-                    if (j > w) {
-                        /* No valid values left; drop back. */
+                break;
+
+            case C_ADD:
+            case C_MUL:
+                /*
+                 * Addition and multiplication cages require exhaustive
+                 * enumeration of all valid digit combinations.
+                 *
+                 * Rather than recursive function calls, we use iterative
+                 * enumeration via the scratch array. The index i tracks
+                 * which cell in the cage is currently being incremented.
+                 */
+                i = 0;
+                ctx->dscratch[i] = 0;
+                total = (int)value; /* start with the identity */
+                while (1) {
+                    if (i < n) {
+                        /*
+                         * Find the next valid value for cell i.
+                         */
+                        for (j = ctx->dscratch[i] + 1; j <= w; j++) {
+                            if (op == C_ADD ? (total < j) : (total % j != 0))
+                                continue; /* this one won't fit */
+                            if (!solver->cube[sq[i] * w + j - 1])
+                                continue; /* this one is ruled out already */
+                            for (k = 0; k < i; k++)
+                                if (ctx->dscratch[k] == j &&
+                                    (sq[k] % w == sq[i] % w || sq[k] / w == sq[i] / w))
+                                    break; /* clashes with another row/col */
+                            if (k < i) continue;
+
+                            /* Found one. */
+                            break;
+                        }
+
+                        if (j > w) {
+                            /* No valid values left; drop back. */
+                            i--;
+                            if (i < 0) break; /* overall iteration is finished */
+                            if (op == C_ADD)
+                                total += ctx->dscratch[i];
+                            else
+                                total *= ctx->dscratch[i];
+                        } else {
+                            /* Got a valid value; store it and move on. */
+                            ctx->dscratch[i++] = (digit)j;
+                            if (op == C_ADD)
+                                total -= j;
+                            else
+                                total /= j;
+                            ctx->dscratch[i] = 0;
+                        }
+                    } else {
+                        if (total == (op == C_ADD ? 0 : 1)) solver_clue_candidate(ctx, diff, box);
                         i--;
-                        if (i < 0)
-                            break; /* overall iteration is finished */
                         if (op == C_ADD)
                             total += ctx->dscratch[i];
                         else
                             total *= ctx->dscratch[i];
+                    }
+                }
+
+                break;
+
+            case C_MOD:
+                /*
+                 * Modulo operation: a % b = clue. 2-cell cages only.
+                 * For each divisor d from 1 to w, find all pairs (a,d) where a % d = value.
+                 * Since we want pairs where the larger mod smaller = value:
+                 *   dividend % divisor = remainder  =>  dividend = k*divisor + remainder
+                 */
+                assert(n == 2);
+
+                for (i = 1; i <= w; i++) {     /* divisor */
+                    if (value >= i) continue;  /* remainder must be < divisor */
+                    for (j = 1; j <= w; j++) { /* dividend */
+                        if (j <= i) continue;  /* dividend > divisor for meaningful mod */
+                        if (j % i != value) continue;
+
+                        /* (j, i) is a valid pair: j % i = value */
+                        if (solver->cube[sq[0] * w + j - 1] && solver->cube[sq[1] * w + i - 1]) {
+                            ctx->dscratch[0] = (digit)j;
+                            ctx->dscratch[1] = (digit)i;
+                            solver_clue_candidate(ctx, diff, box);
+                        }
+                        if (solver->cube[sq[0] * w + i - 1] && solver->cube[sq[1] * w + j - 1]) {
+                            ctx->dscratch[0] = (digit)i;
+                            ctx->dscratch[1] = (digit)j;
+                            solver_clue_candidate(ctx, diff, box);
+                        }
+                    }
+                }
+                break;
+
+            case C_GCD:
+                /*
+                 * GCD cages: GCD of all digits = clue value.
+                 * Uses iterative enumeration similar to ADD/MUL.
+                 * All digits must be divisible by the clue (GCD result).
+                 */
+                i = 0;
+                ctx->dscratch[i] = 0;
+                while (1) {
+                    if (i < n) {
+                        /* Find next digit that is divisible by the target GCD */
+                        for (j = ctx->dscratch[i] + 1; j <= w; j++) {
+                            if (j % value != 0) continue; /* Must be multiple of GCD */
+                            if (!solver->cube[sq[i] * w + j - 1]) continue;
+                            /* Check Latin square constraint */
+                            for (k = 0; k < i; k++)
+                                if (ctx->dscratch[k] == j &&
+                                    (sq[k] % w == sq[i] % w || sq[k] / w == sq[i] / w))
+                                    break;
+                            if (k < i) continue;
+                            break;
+                        }
+
+                        if (j > w) {
+                            i--;
+                            if (i < 0) break;
+                        } else {
+                            ctx->dscratch[i++] = (digit)j;
+                            ctx->dscratch[i] = 0;
+                        }
                     } else {
-                        /* Got a valid value; store it and move on. */
-                        ctx->dscratch[i++] = j;
-                        if (op == C_ADD)
-                            total -= j;
-                        else
-                            total /= j;
-                        ctx->dscratch[i] = 0;
-                    }
-                } else {
-                    if (total == (op == C_ADD ? 0 : 1))
-                        solver_clue_candidate(ctx, diff, box);
-                    i--;
-                    if (op == C_ADD)
-                        total += ctx->dscratch[i];
-                    else
-                        total *= ctx->dscratch[i];
-                }
-            }
-
-            break;
-
-        case C_MOD:
-            /*
-             * Modulo operation: a % b = clue. 2-cell cages only.
-             * For each divisor d from 1 to w, find all pairs (a,d) where a % d = value.
-             * Since we want pairs where the larger mod smaller = value:
-             *   dividend % divisor = remainder  =>  dividend = k*divisor + remainder
-             */
-            assert(n == 2);
-
-            for (i = 1; i <= w; i++) {  /* divisor */
-                if (value >= i) continue;  /* remainder must be < divisor */
-                for (j = 1; j <= w; j++) {  /* dividend */
-                    if (j <= i) continue;  /* dividend > divisor for meaningful mod */
-                    if (j % i != value) continue;
-
-                    /* (j, i) is a valid pair: j % i = value */
-                    if (solver->cube[sq[0] * w + j - 1] && solver->cube[sq[1] * w + i - 1]) {
-                        ctx->dscratch[0] = j;
-                        ctx->dscratch[1] = i;
-                        solver_clue_candidate(ctx, diff, box);
-                    }
-                    if (solver->cube[sq[0] * w + i - 1] && solver->cube[sq[1] * w + j - 1]) {
-                        ctx->dscratch[0] = i;
-                        ctx->dscratch[1] = j;
-                        solver_clue_candidate(ctx, diff, box);
-                    }
-                }
-            }
-            break;
-
-        case C_GCD:
-            /*
-             * GCD cages: GCD of all digits = clue value.
-             * Uses iterative enumeration similar to ADD/MUL.
-             * All digits must be divisible by the clue (GCD result).
-             */
-            i = 0;
-            ctx->dscratch[i] = 0;
-            while (1) {
-                if (i < n) {
-                    /* Find next digit that is divisible by the target GCD */
-                    for (j = ctx->dscratch[i] + 1; j <= w; j++) {
-                        if (j % value != 0)
-                            continue;  /* Must be multiple of GCD */
-                        if (!solver->cube[sq[i] * w + j - 1])
-                            continue;
-                        /* Check Latin square constraint */
-                        for (k = 0; k < i; k++)
-                            if (ctx->dscratch[k] == j &&
-                                (sq[k] % w == sq[i] % w || sq[k] / w == sq[i] / w))
-                                break;
-                        if (k < i)
-                            continue;
-                        break;
-                    }
-
-                    if (j > w) {
+                        /* Check if GCD of collected digits equals value */
+                        if (gcd_array(ctx->dscratch, n) == value)
+                            solver_clue_candidate(ctx, diff, box);
                         i--;
-                        if (i < 0) break;
-                    } else {
-                        ctx->dscratch[i++] = j;
-                        ctx->dscratch[i] = 0;
                     }
-                } else {
-                    /* Check if GCD of collected digits equals value */
-                    if (gcd_array(ctx->dscratch, n) == value)
-                        solver_clue_candidate(ctx, diff, box);
-                    i--;
                 }
-            }
-            break;
+                break;
 
-        case C_LCM:
-            /*
-             * LCM cages: LCM of all digits = clue value.
-             * All digits must be divisors of the clue value.
-             */
-            i = 0;
-            ctx->dscratch[i] = 0;
-            while (1) {
-                if (i < n) {
-                    /* Find next digit that divides the target LCM */
-                    for (j = ctx->dscratch[i] + 1; j <= w; j++) {
-                        if (value % j != 0)
-                            continue;  /* Must divide LCM */
-                        if (!solver->cube[sq[i] * w + j - 1])
-                            continue;
-                        /* Check Latin square constraint */
-                        for (k = 0; k < i; k++)
-                            if (ctx->dscratch[k] == j &&
-                                (sq[k] % w == sq[i] % w || sq[k] / w == sq[i] / w))
-                                break;
-                        if (k < i)
-                            continue;
-                        break;
-                    }
+            case C_LCM:
+                /*
+                 * LCM cages: LCM of all digits = clue value.
+                 * All digits must be divisors of the clue value.
+                 */
+                i = 0;
+                ctx->dscratch[i] = 0;
+                while (1) {
+                    if (i < n) {
+                        /* Find next digit that divides the target LCM */
+                        for (j = ctx->dscratch[i] + 1; j <= w; j++) {
+                            if (value % j != 0) continue; /* Must divide LCM */
+                            if (!solver->cube[sq[i] * w + j - 1]) continue;
+                            /* Check Latin square constraint */
+                            for (k = 0; k < i; k++)
+                                if (ctx->dscratch[k] == j &&
+                                    (sq[k] % w == sq[i] % w || sq[k] / w == sq[i] / w))
+                                    break;
+                            if (k < i) continue;
+                            break;
+                        }
 
-                    if (j > w) {
+                        if (j > w) {
+                            i--;
+                            if (i < 0) break;
+                        } else {
+                            ctx->dscratch[i++] = (digit)j;
+                            ctx->dscratch[i] = 0;
+                        }
+                    } else {
+                        /* Check if LCM of collected digits equals value */
+                        if (lcm_array(ctx->dscratch, n) == value)
+                            solver_clue_candidate(ctx, diff, box);
                         i--;
-                        if (i < 0) break;
-                    } else {
-                        ctx->dscratch[i++] = j;
-                        ctx->dscratch[i] = 0;
                     }
-                } else {
-                    /* Check if LCM of collected digits equals value */
-                    if (lcm_array(ctx->dscratch, n) == value)
-                        solver_clue_candidate(ctx, diff, box);
-                    i--;
                 }
-            }
-            break;
+                break;
 
-        case C_XOR:
-            /*
-             * XOR cages: XOR of all digits = clue value.
-             * Bitwise exclusive-or is associative and commutative.
-             * XOR has HIGH AMBIGUITY: many digit combinations produce same result,
-             * making it excellent for increasing puzzle difficulty.
-             *
-             * Properties:
-             *   - XOR(a) = a
-             *   - XOR(a,b) = a ^ b
-             *   - XOR(a,a) = 0  (self-inverse)
-             *   - XOR(a,0) = a  (identity)
-             */
-            i = 0;
-            ctx->dscratch[i] = 0;
-            total = 0;  /* XOR identity is 0 */
-            while (1) {
-                if (i < n) {
-                    /* Find next valid digit */
-                    for (j = ctx->dscratch[i] + 1; j <= w; j++) {
-                        if (!solver->cube[sq[i] * w + j - 1])
-                            continue;
-                        /* Check Latin square constraint */
-                        for (k = 0; k < i; k++)
-                            if (ctx->dscratch[k] == j &&
-                                (sq[k] % w == sq[i] % w || sq[k] / w == sq[i] / w))
-                                break;
-                        if (k < i)
-                            continue;
-                        break;
-                    }
+            case C_XOR:
+                /*
+                 * XOR cages: XOR of all digits = clue value.
+                 * Bitwise exclusive-or is associative and commutative.
+                 * XOR has HIGH AMBIGUITY: many digit combinations produce same result,
+                 * making it excellent for increasing puzzle difficulty.
+                 *
+                 * Properties:
+                 *   - XOR(a) = a
+                 *   - XOR(a,b) = a ^ b
+                 *   - XOR(a,a) = 0  (self-inverse)
+                 *   - XOR(a,0) = a  (identity)
+                 */
+                i = 0;
+                ctx->dscratch[i] = 0;
+                total = 0; /* XOR identity is 0 */
+                while (1) {
+                    if (i < n) {
+                        /* Find next valid digit */
+                        for (j = ctx->dscratch[i] + 1; j <= w; j++) {
+                            if (!solver->cube[sq[i] * w + j - 1]) continue;
+                            /* Check Latin square constraint */
+                            for (k = 0; k < i; k++)
+                                if (ctx->dscratch[k] == j &&
+                                    (sq[k] % w == sq[i] % w || sq[k] / w == sq[i] / w))
+                                    break;
+                            if (k < i) continue;
+                            break;
+                        }
 
-                    if (j > w) {
+                        if (j > w) {
+                            i--;
+                            if (i < 0) break;
+                            total ^= ctx->dscratch[i]; /* Undo XOR (self-inverse) */
+                        } else {
+                            ctx->dscratch[i++] = (digit)j;
+                            total ^= j; /* Apply XOR */
+                            ctx->dscratch[i] = 0;
+                        }
+                    } else {
+                        /* Check if XOR of collected digits equals value */
+                        if (total == value) solver_clue_candidate(ctx, diff, box);
                         i--;
-                        if (i < 0) break;
-                        total ^= ctx->dscratch[i];  /* Undo XOR (self-inverse) */
-                    } else {
-                        ctx->dscratch[i++] = j;
-                        total ^= j;  /* Apply XOR */
-                        ctx->dscratch[i] = 0;
+                        total ^= ctx->dscratch[i]; /* Undo XOR */
                     }
-                } else {
-                    /* Check if XOR of collected digits equals value */
-                    if (total == value)
-                        solver_clue_candidate(ctx, diff, box);
-                    i--;
-                    total ^= ctx->dscratch[i];  /* Undo XOR */
                 }
-            }
-            break;
+                break;
         }
 
         /*
@@ -896,15 +866,14 @@ static int solver_common(struct latin_solver *solver, void *vctx, int diff) {
              * for the Hard deductions but not the Easy/Normal ones,
              * because only the Hard deductions are cross-box.)
              */
-            if (ret)
-                return ret;
+            if (ret) return ret;
         }
     }
 
     return ret;
 }
 
-static int solver_easy(struct latin_solver *solver, void *vctx) {
+static int solver_easy(struct latin_solver* solver, void* vctx) {
     /*
      * Omit the EASY deductions when solving at NORMAL level, since
      * the NORMAL deductions are a superset of them anyway and it
@@ -920,17 +889,16 @@ static int solver_easy(struct latin_solver *solver, void *vctx) {
      * so as to double-check by re-solving at the next difficulty
      * level down and making sure it failed.
      */
-    struct solver_ctx *ctx = (struct solver_ctx *)vctx;
-    if (ctx->diff > DIFF_EASY)
-        return 0;
+    struct solver_ctx* ctx = (struct solver_ctx*)vctx;
+    if (ctx->diff > DIFF_EASY) return 0;
     return solver_common(solver, vctx, DIFF_EASY);
 }
 
-static int solver_normal(struct latin_solver *solver, void *vctx) {
+static int solver_normal(struct latin_solver* solver, void* vctx) {
     return solver_common(solver, vctx, DIFF_NORMAL);
 }
 
-static int solver_hard(struct latin_solver *solver, void *vctx) {
+static int solver_hard(struct latin_solver* solver, void* vctx) {
     return solver_common(solver, vctx, DIFF_HARD);
 }
 
@@ -938,7 +906,7 @@ static int solver_hard(struct latin_solver *solver, void *vctx) {
  * EXTREME: Uses all Keen-specific deductions at HARD level.
  * The additional difficulty comes from latin.c's forcing chains.
  */
-static int solver_extreme(struct latin_solver *solver, void *vctx) {
+static int solver_extreme(struct latin_solver* solver, void* vctx) {
     return solver_common(solver, vctx, DIFF_HARD);
 }
 
@@ -947,7 +915,7 @@ static int solver_extreme(struct latin_solver *solver, void *vctx) {
  * The additional difficulty comes from latin.c's limited recursion.
  * Puzzles at this level may require some trial-and-error.
  */
-static int solver_unreasonable(struct latin_solver *solver, void *vctx) {
+static int solver_unreasonable(struct latin_solver* solver, void* vctx) {
     return solver_common(solver, vctx, DIFF_HARD);
 }
 
@@ -956,7 +924,7 @@ static int solver_unreasonable(struct latin_solver *solver, void *vctx) {
  * Uses all available techniques including full backtracking.
  * Puzzles may require extensive trial-and-error to solve.
  */
-static int solver_ludicrous(struct latin_solver *solver, void *vctx) {
+static int solver_ludicrous(struct latin_solver* solver, void* vctx) {
     return solver_common(solver, vctx, DIFF_HARD);
 }
 
@@ -966,14 +934,14 @@ static int solver_ludicrous(struct latin_solver *solver, void *vctx) {
  * multiple simultaneous hypotheses, and advanced constraint propagation.
  * Only for the most dedicated puzzle solvers.
  */
-static int solver_incomprehensible(struct latin_solver *solver, void *vctx) {
+static int solver_incomprehensible(struct latin_solver* solver, void* vctx) {
     return solver_common(solver, vctx, DIFF_HARD);
 }
 
 #define SOLVER(upper, title, func, lower) func,
 static usersolver_t const keen_solvers[] = {DIFFLIST(SOLVER)};
 
-static int solver(int w, int *dsf, long *clues, digit *soln, int maxdiff, int mode_flags) {
+static int solver(int w, int* dsf, long* clues, digit* soln, int maxdiff, int mode_flags) {
     int a = w * w;
     struct solver_ctx ctx;
     int ret;
@@ -993,12 +961,11 @@ static int solver(int w, int *dsf, long *clues, digit *soln, int maxdiff, int mo
      * puts x first (oops).
      */
     for (ctx.nboxes = i = 0; i < a; i++)
-        if (dsf_canonify(dsf, i) == i)
-            ctx.nboxes++;
-    ctx.boxlist = snewn(a, int);
-    ctx.boxes = snewn(ctx.nboxes + 1, int);
-    ctx.clues = snewn(ctx.nboxes, long);
-    ctx.whichbox = snewn(a, int);
+        if (dsf_canonify(dsf, i) == i) ctx.nboxes++;
+    ctx.boxlist = snewn((size_t)a, int);
+    ctx.boxes = snewn((size_t)(ctx.nboxes + 1), int);
+    ctx.clues = snewn((size_t)ctx.nboxes, long);
+    ctx.whichbox = snewn((size_t)a, int);
     for (n = m = i = 0; i < a; i++)
         if (dsf_canonify(dsf, i) == i) {
             ctx.clues[n] = clues[i];
@@ -1014,8 +981,8 @@ static int solver(int w, int *dsf, long *clues, digit *soln, int maxdiff, int mo
     assert(m == a);
     ctx.boxes[n] = m;
 
-    ctx.dscratch = snewn(a + 1, digit);
-    ctx.iscratch = snewn(max(a + 1, 4 * w), int);
+    ctx.dscratch = snewn((size_t)(a + 1), digit);
+    ctx.iscratch = snewn((size_t)max(a + 1, 4 * w), int);
 
     /*
      * latin_solver difficulty mapping for 7-level system:
@@ -1029,7 +996,7 @@ static int solver(int w, int *dsf, long *clues, digit *soln, int maxdiff, int mo
      * and INCOMPREHENSIBLE, requiring progressively more trial-and-error.
      */
     ret = latin_solver(soln, w, maxdiff, DIFF_EASY, DIFF_NORMAL, DIFF_HARD, DIFF_EXTREME,
-                       DIFF_INCOMPREHENSIBLE, keen_solvers, &ctx, NULL, NULL);
+                       DIFF_INCOMPREHENSIBLE, keen_solvers, &ctx, nullptr, nullptr);
 
     sfree(ctx.dscratch);
     sfree(ctx.iscratch);
@@ -1045,7 +1012,7 @@ static int solver(int w, int *dsf, long *clues, digit *soln, int maxdiff, int mo
  * Grid generation.
  */
 
-static char *encode_block_structure(char *p, int w, int *dsf) {
+[[maybe_unused]] static char* encode_block_structure(char* p, int w, int* dsf) {
     int i, currrun = 0;
     char *orig, *q, *r, c;
 
@@ -1067,7 +1034,7 @@ static char *encode_block_structure(char *p, int w, int *dsf) {
         int x, y, p0, p1, edge;
 
         if (i == 2 * w * (w - 1)) {
-            edge = TRUE; /* terminating virtual edge */
+            edge = true; /* terminating virtual edge */
         } else {
             if (i < w * (w - 1)) {
                 y = i / (w - 1);
@@ -1084,10 +1051,9 @@ static char *encode_block_structure(char *p, int w, int *dsf) {
         }
 
         if (edge) {
-            while (currrun > 25)
-                *p++ = 'z', currrun -= 25;
+            while (currrun > 25) *p++ = 'z', currrun -= 25;
             if (currrun)
-                *p++ = 'a' - 1 + currrun;
+                *p++ = (char)('a' - 1 + currrun);
             else
                 *p++ = '_';
             currrun = 0;
@@ -1105,8 +1071,7 @@ static char *encode_block_structure(char *p, int w, int *dsf) {
     for (q = r = orig; r < p;) {
         *q++ = c = *r;
 
-        for (i = 0; r + i < p && r[i] == c; i++)
-            ;
+        for (i = 0; r + i < p && r[i] == c; i++);
         r += i;
 
         if (i == 2) {
@@ -1119,7 +1084,7 @@ static char *encode_block_structure(char *p, int w, int *dsf) {
     return q;
 }
 
-static char *parse_block_structure(const char **p, int w, int *dsf) {
+[[maybe_unused]] static char* parse_block_structure(const char** p, int w, int* dsf) {
     int a = w * w;
     int pos = 0;
     int repc = 0, repn = 0;
@@ -1138,8 +1103,7 @@ static char *parse_block_structure(const char **p, int w, int *dsf) {
             if (**p && isdigit((unsigned char)**p)) {
                 repc = c;
                 repn = atoi(*p) - 1;
-                while (**p && isdigit((unsigned char)**p))
-                    (*p)++;
+                while (**p && isdigit((unsigned char)**p)) (*p)++;
             }
         } else
             return "Invalid character in game description";
@@ -1153,8 +1117,7 @@ static char *parse_block_structure(const char **p, int w, int *dsf) {
              * Non-edge; merge the two dsf classes on either
              * side of it.
              */
-            if (pos >= 2 * w * (w - 1))
-                return "Too much data in block structure specification";
+            if (pos >= 2 * w * (w - 1)) return "Too much data in block structure specification";
             if (pos < w * (w - 1)) {
                 int y = pos / (w - 1);
                 int x = pos % (w - 1);
@@ -1172,8 +1135,7 @@ static char *parse_block_structure(const char **p, int w, int *dsf) {
         }
         if (adv) {
             pos++;
-            if (pos > 2 * w * (w - 1) + 1)
-                return "Too much data in block structure specification";
+            if (pos > 2 * w * (w - 1) + 1) return "Too much data in block structure specification";
         }
     }
 
@@ -1182,10 +1144,9 @@ static char *parse_block_structure(const char **p, int w, int *dsf) {
      * one space _past_ the end of the grid, due to the dummy
      * edge at the end.
      */
-    if (pos != 2 * w * (w - 1) + 1)
-        return "Not enough data in block structure specification";
+    if (pos != 2 * w * (w - 1) + 1) return "Not enough data in block structure specification";
 
-    return NULL;
+    return nullptr;
 }
 
 /*
@@ -1218,8 +1179,8 @@ static char *parse_block_structure(const char **p, int w, int *dsf) {
  *   maxblk   - maximum allowed cage size
  *   rs       - random state for selecting which pair to merge
  */
-static int try_merge_cages(int w, int *dsf, digit *grid, long *clues, long *cluevals,
-                           int maxblk, random_state *rs) {
+static int try_merge_cages(int w, int* dsf, digit* grid, long* clues,
+                           [[maybe_unused]] long* cluevals, int maxblk, random_state* rs) {
     int a = w * w;
     int i, x, y, ni;
     int *candidates, ncand = 0;
@@ -1230,7 +1191,7 @@ static int try_merge_cages(int w, int *dsf, digit *grid, long *clues, long *clue
      * - Combined cage size <= maxblk
      * - We store as (cell * a + neighbor) to encode both indices
      */
-    candidates = snewn(a * 4, int);  /* Max 4 neighbors per cell */
+    candidates = snewn((size_t)(a * 4), int); /* Max 4 neighbors per cell */
 
     for (i = 0; i < a; i++) {
         int ci = dsf_canonify(dsf, i);
@@ -1259,13 +1220,13 @@ static int try_merge_cages(int w, int *dsf, digit *grid, long *clues, long *clue
 
     if (ncand == 0) {
         sfree(candidates);
-        return FALSE;  /* No valid merge candidates */
+        return false; /* No valid merge candidates */
     }
 
     /*
      * Randomly select a merge pair to avoid bias.
      */
-    int choice = random_upto(rs, ncand);
+    int choice = (int)random_upto(rs, (unsigned long)ncand);
     int c1 = candidates[choice] / a;
     int c2 = candidates[choice] % a;
     sfree(candidates);
@@ -1301,15 +1262,17 @@ static int try_merge_cages(int w, int *dsf, digit *grid, long *clues, long *clue
     clues[canon2] = 0;
     clues[new_canon] = C_ADD | new_val;
 
-    return TRUE;
+    return true;
 }
 
 /*
  * Recalculate all clues after cage mutations.
  * Call this after modifying DSF to ensure clue consistency.
  */
-static void recalculate_clues(int w, int *dsf, digit *grid, long *clues, long *cluevals,
-                              int mode_flags, random_state *rs) {
+[[maybe_unused]] static void recalculate_clues(int w, int* dsf, digit* grid, long* clues,
+                              long*  cluevals,
+                              [[maybe_unused]] int mode_flags,
+                              [[maybe_unused]] random_state* rs) {
     int a = w * w;
     int i, j;
 
@@ -1350,7 +1313,8 @@ static void recalculate_clues(int w, int *dsf, digit *grid, long *clues, long *c
     }
 }
 
-char *new_game_desc(const game_params *params, random_state *rs, char **aux, int interactive) {
+char* new_game_desc(const game_params* params, random_state* rs, char** aux, int interactive) {
+    (void)interactive;
     int w = params->w, a = w * w;
     digit *grid, *soln;
     int *order, *revorder, *singletons, *dsf;
@@ -1358,16 +1322,15 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
     int i, j, k, n, x, y, ret;
     int diff = params->diff;
     int maxblk = get_maxblk_for_diff(params->mode_flags, diff);
-    (void)get_minblk(params->mode_flags);  /* Reserved for future constraint validation */
+    (void)get_minblk(params->mode_flags); /* Reserved for future constraint validation */
     char *desc, *p;
 
     /*
-     * Strict difficulty enforcement:
      * If the requested difficulty cannot be achieved within max_retries,
      * return NULL. No fallback - the user expects the exact difficulty
      * they selected. The UI will display an appropriate error message.
      */
-    grid = NULL;
+    grid = nullptr;
 
     order = snewn(a, int);
     revorder = snewn(a, int);
@@ -1390,9 +1353,12 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
      * - UNREASONABLE+: 8x multiplier (very rare puzzle structures)
      */
     int difficulty_multiplier = 1;
-    if (diff >= DIFF_UNREASONABLE) difficulty_multiplier = 8;
-    else if (diff >= DIFF_EXTREME) difficulty_multiplier = 4;
-    else if (diff >= DIFF_HARD) difficulty_multiplier = 2;
+    if (diff >= DIFF_UNREASONABLE)
+        difficulty_multiplier = 8;
+    else if (diff >= DIFF_EXTREME)
+        difficulty_multiplier = 4;
+    else if (diff >= DIFF_HARD)
+        difficulty_multiplier = 2;
 
     int max_retries = (1000 + (a * 20)) * difficulty_multiplier;
     int attempts = 0;
@@ -1417,23 +1383,9 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
          * - Negative mode: UI displays -N/2..+N/2, internally 1..N
          */
 
-        /*
-         * Divide the grid into arbitrarily sized blocks, but so as
-         * to arrange plenty of dominoes which can be SUB/DIV clues.
-         * We do this by first placing dominoes at random for a
-         * while, then tying the remaining singletons one by one
-         * into neighbouring blocks.
-         */
-        for (i = 0; i < a; i++)
-            order[i] = i;
+        for (i = 0; i < a; i++) revorder[order[i]] = i;
 
-        shuffle(order, a, sizeof(*order), rs);
-
-        for (i = 0; i < a; i++)
-            revorder[order[i]] = i;
-
-        for (i = 0; i < a; i++)
-            singletons[i] = TRUE;
+        for (i = 0; i < a; i++) singletons[i] = true;
 
         dsf_init(dsf, a);
 
@@ -1459,15 +1411,8 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                     (best == -1 || revorder[i + w] < revorder[best]))
                     best = i + w;
 
-                /*
-                 * When we find a potential domino, we place it with
-                 * probability 3/4, which seems to strike a decent
-                 * balance between plenty of dominoes and leaving
-                 * enough singletons to make interesting larger
-                 * shapes.
-                 */
                 if (best >= 0 && random_upto(rs, 4)) {
-                    singletons[i] = singletons[best] = FALSE;
+                    singletons[i] = singletons[best] = false;
                     dsf_merge(dsf, i, best);
                 }
             }
@@ -1498,7 +1443,7 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                     best = i + w;
 
                 if (best >= 0) {
-                    singletons[i] = singletons[best] = FALSE;
+                    singletons[i] = singletons[best] = false;
                     dsf_merge(dsf, i, best);
                 }
             }
@@ -1507,11 +1452,9 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
         /* Quit and start again if we have any singletons left over
          * which we weren't able to do anything at all with. */
         for (i = 0; i < a; i++)
-            if (singletons[i])
-                break;
+            if (singletons[i]) break;
 
-        if (i < a)
-            continue;
+        if (i < a) continue;
 
         /*
          * Decide what would be acceptable clues for each block.
@@ -1536,12 +1479,12 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
 #define F_SUB 0x002
 #define F_MUL 0x004
 #define F_DIV 0x008
-#define F_EXP 0x010  /* Exponentiation: base^exp */
-#define F_MOD 0x020  /* Modulo: larger % smaller */
-#define F_GCD 0x040  /* Greatest common divisor */
-#define F_LCM 0x080  /* Least common multiple */
-#define F_XOR 0x100  /* Bitwise XOR (high ambiguity) */
-#define BAD_SHIFT 9  /* Increased for 9+ clue types */
+#define F_EXP 0x010 /* Exponentiation: base^exp */
+#define F_MOD 0x020 /* Modulo: larger % smaller */
+#define F_GCD 0x040 /* Greatest common divisor */
+#define F_LCM 0x080 /* Least common multiple */
+#define F_XOR 0x100 /* Bitwise XOR (high ambiguity) */
+#define BAD_SHIFT 9 /* Increased for 9+ clue types */
 
         for (i = 0; i < a; i++) {
             singletons[i] = 0;
@@ -1552,14 +1495,13 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
             else if (j == i && k > 2) {
                 singletons[j] |= F_ADD | F_MUL;
                 /* XOR works great on N-cell cages with MODE_BITWISE */
-                if (HAS_MODE(params->mode_flags, MODE_BITWISE))
-                    singletons[j] |= F_XOR;
+                if (HAS_MODE(params->mode_flags, MODE_BITWISE)) singletons[j] |= F_XOR;
             } else if (j != i && k == 2) {
                 /* Fetch the two numbers and sort them into order. */
-                int p = grid[j], q = grid[i], v;
-                if (p < q) {
-                    int t = p;
-                    p = q;
+                int p_val = grid[j], q = grid[i], v;
+                if (p_val < q) {
+                    int t = p_val;
+                    p_val = q;
                     q = t;
                 }
 
@@ -1569,7 +1511,7 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                  * because they're too easy - they only leave one
                  * option for the pair of numbers involved.
                  */
-                v = p + q;
+                v = p_val + q;
                 if (v > 4 && v < 2 * w - 2)
                     singletons[j] |= F_ADD;
                 else
@@ -1580,11 +1522,10 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                  * prefer (but don't absolutely insist on) clues of
                  * this type which leave multiple options open.
                  */
-                v = p * q;
+                v = p_val * q;
                 n = 0;
                 for (k = 1; k <= w; k++)
-                    if (v % k == 0 && v / k <= w && v / k != k)
-                        n++;
+                    if (v % k == 0 && v / k <= w && v / k != k) n++;
                 if (n <= 2 && diff > DIFF_NORMAL)
                     singletons[j] |= F_MUL << BAD_SHIFT;
                 else
@@ -1594,9 +1535,8 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                  * Subtraction: we completely avoid a difference of
                  * w-1.
                  */
-                v = p - q;
-                if (v < w - 1)
-                    singletons[j] |= F_SUB;
+                v = p_val - q;
+                if (v < w - 1) singletons[j] |= F_SUB;
 
                 /*
                  * Division: for a start, the quotient must be an
@@ -1612,8 +1552,8 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                  */
                 if (!HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE) &&
                     !HAS_MODE(params->mode_flags, MODE_NEGATIVE) &&
-                    !HAS_MODE(params->mode_flags, MODE_MODULAR) &&
-                    p % q == 0 && 2 * (p / q) <= w)
+                    !HAS_MODE(params->mode_flags, MODE_MODULAR) && p_val % q == 0 &&
+                    2 * (p_val / q) <= w)
                     singletons[j] |= F_DIV;
 
                 /*
@@ -1626,11 +1566,10 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                     long exp_val = 1;
                     int valid = 1;
                     for (int e = 0; e < q && valid; e++) {
-                        exp_val *= p;
-                        if (exp_val > 10000) valid = 0;  /* Clue too large */
+                        exp_val *= p_val;
+                        if (exp_val > 10000) valid = 0; /* Clue too large */
                     }
-                    if (valid && exp_val <= 10000)
-                        singletons[j] |= F_EXP;
+                    if (valid && exp_val <= 10000) singletons[j] |= F_EXP;
                 }
 
                 /*
@@ -1642,9 +1581,8 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                      * Modulo: p % q (larger % smaller). Avoid trivial cases
                      * where remainder is 0 (that's just division info).
                      */
-                    v = p % q;
-                    if (v > 0 && v < q)
-                        singletons[j] |= F_MOD;
+                    v = p_val % q;
+                    if (v > 0 && v < q) singletons[j] |= F_MOD;
 
                     /*
                      * GCD: gcd(p, q). Difficulty-aware preference:
@@ -1654,27 +1592,27 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                      * GCD=1 is the most ambiguous constraint possible for 2-cell cages,
                      * forcing the solver to use advanced techniques rather than direct deduction.
                      */
-                    v = (int)gcd_helper(p, q);
+                    v = (int)gcd_helper(p_val, q);
                     if (diff >= DIFF_HARD) {
                         /* Hard+: GCD=1 is GOOD (high ambiguity = harder) */
                         if (v == 1)
                             singletons[j] |= F_GCD;
                         else if (v > 1 && v < q)
-                            singletons[j] |= F_GCD << BAD_SHIFT;  /* Less ambiguous */
+                            singletons[j] |= F_GCD << BAD_SHIFT; /* Less ambiguous */
                     } else {
                         /* Easy/Normal: GCD > 1 is GOOD (more informative) */
                         if (v > 1 && v < q)
                             singletons[j] |= F_GCD;
                         else if (v == 1)
-                            singletons[j] |= F_GCD << BAD_SHIFT;  /* Too ambiguous */
+                            singletons[j] |= F_GCD << BAD_SHIFT; /* Too ambiguous */
                     }
 
                     /*
                      * LCM: lcm(p, q). Avoid cases where LCM > 100 (clue overflow)
                      * or LCM = p*q (coprime, trivial).
                      */
-                    v = (int)lcm_helper(p, q);
-                    if (v <= 100 && v < p * q)
+                    v = (int)lcm_helper(p_val, q);
+                    if (v <= 100 && v < p_val * q)
                         singletons[j] |= F_LCM;
                     else if (v <= 100)
                         singletons[j] |= F_LCM << BAD_SHIFT;
@@ -1689,11 +1627,11 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                  * it provides minimal constraint information.
                  */
                 if (HAS_MODE(params->mode_flags, MODE_BITWISE)) {
-                    v = p ^ q;
+                    v = p_val ^ q;
                     if (diff >= DIFF_HARD)
-                        singletons[j] |= F_XOR;  /* Always good at hard+ */
+                        singletons[j] |= F_XOR; /* Always good at hard+ */
                     else
-                        singletons[j] |= F_XOR << BAD_SHIFT;  /* Too ambiguous for easy */
+                        singletons[j] |= F_XOR << BAD_SHIFT; /* Too ambiguous for easy */
                 }
             }
         }
@@ -1714,8 +1652,7 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
          * by the maximum number of dominoes in a 9x9 grid.
          */
         shuffle(order, a, sizeof(*order), rs);
-        for (i = 0; i < a; i++)
-            clues[i] = 0;
+        for (i = 0; i < a; i++) clues[i] = 0;
 
         /*
          * Operation order arrays: different priorities for different difficulties.
@@ -1723,56 +1660,58 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
          * Hard+: Prefer ambiguous ops (XOR, GCD, ADD, LCM) for harder puzzles.
          * Index mapping: 0=DIV, 1=SUB, 2=MUL, 3=ADD, 4=EXP, 5=MOD, 6=GCD, 7=LCM, 8=XOR
          */
-        static const int op_order_easy[9] = {0, 1, 2, 3, 4, 5, 6, 7, 8};  /* DIV...LCM,XOR (XOR last) */
-        static const int op_order_hard[9] = {8, 6, 3, 7, 5, 1, 2, 0, 4};  /* XOR,GCD,ADD,LCM,MOD,SUB,MUL,DIV,EXP */
-        const int *op_order = (diff >= DIFF_HARD) ? op_order_hard : op_order_easy;
+        static const int op_order_easy[9] = {0, 1, 2, 3, 4,
+                                             5, 6, 7, 8}; /* DIV...LCM,XOR (XOR last) */
+        static const int op_order_hard[9] = {8, 6, 3, 7, 5,
+                                             1, 2, 0, 4}; /* XOR,GCD,ADD,LCM,MOD,SUB,MUL,DIV,EXP */
+        const int* op_order = (diff >= DIFF_HARD) ? op_order_hard : op_order_easy;
 
         while (1) {
-            int done_something = FALSE;
+            int done_something = false;
 
             for (int op_idx = 0; op_idx < 9; op_idx++) {
                 long clue;
                 int good, bad;
-                k = op_order[op_idx];  /* Use difficulty-aware ordering */
+                k = op_order[op_idx]; /* Use difficulty-aware ordering */
                 switch (k) {
-                case 0:
-                    clue = C_DIV;
-                    good = F_DIV;
-                    break;
-                case 1:
-                    clue = C_SUB;
-                    good = F_SUB;
-                    break;
-                case 2:
-                    clue = C_MUL;
-                    good = F_MUL;
-                    break;
-                case 3:
-                    clue = C_ADD;
-                    good = F_ADD;
-                    break;
-                case 4:
-                    clue = C_EXP;
-                    good = F_EXP;
-                    break;
-                case 5:
-                    clue = C_MOD;
-                    good = F_MOD;
-                    break;
-                case 6:
-                    clue = C_GCD;
-                    good = F_GCD;
-                    break;
-                case 7:
-                    clue = C_LCM;
-                    good = F_LCM;
-                    break;
-                case 8:
-                    clue = C_XOR;
-                    good = F_XOR;
-                    break;
-                default:
-                    continue;  /* Safety fallback */
+                    case 0:
+                        clue = C_DIV;
+                        good = F_DIV;
+                        break;
+                    case 1:
+                        clue = C_SUB;
+                        good = F_SUB;
+                        break;
+                    case 2:
+                        clue = C_MUL;
+                        good = F_MUL;
+                        break;
+                    case 3:
+                        clue = C_ADD;
+                        good = F_ADD;
+                        break;
+                    case 4:
+                        clue = C_EXP;
+                        good = F_EXP;
+                        break;
+                    case 5:
+                        clue = C_MOD;
+                        good = F_MOD;
+                        break;
+                    case 6:
+                        clue = C_GCD;
+                        good = F_GCD;
+                        break;
+                    case 7:
+                        clue = C_LCM;
+                        good = F_LCM;
+                        break;
+                    case 8:
+                        clue = C_XOR;
+                        good = F_XOR;
+                        break;
+                    default:
+                        continue; /* Safety fallback */
                 }
 
                 for (i = 0; i < a; i++) {
@@ -1795,12 +1734,10 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                         }
                     }
                 }
-                if (i < a)
-                    done_something = TRUE;
+                if (i < a) done_something = true;
             }
 
-            if (!done_something)
-                break;
+            if (!done_something) break;
         }
 #undef F_ADD
 #undef F_SUB
@@ -1822,56 +1759,55 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                 cluevals[j] = grid[i];
             } else {
                 switch (clues[j]) {
-                case C_ADD:
-                    cluevals[j] += grid[i];
-                    break;
-                case C_MUL:
-                    cluevals[j] *= grid[i];
-                    break;
-                case C_SUB:
-                    cluevals[j] = labs(cluevals[j] - grid[i]);
-                    break;
-                case C_DIV: {
-                    int d1 = cluevals[j], d2 = grid[i];
-                    if (d1 == 0 || d2 == 0)
-                        cluevals[j] = 0;
-                    else
-                        cluevals[j] = d2 / d1 + d1 / d2; /* one is 0 :-) */
-                } break;
-                case C_EXP: {
-                    /* Exponentiation: smaller^larger (base^exp) */
-                    long base, exp_val;
-                    long result = 1;
-                    int e;
-                    if (cluevals[j] <= grid[i]) {
-                        base = cluevals[j];
-                        exp_val = grid[i];
-                    } else {
-                        base = grid[i];
-                        exp_val = cluevals[j];
-                    }
-                    for (e = 0; e < exp_val; e++)
-                        result *= base;
-                    cluevals[j] = result;
-                } break;
-                case C_MOD: {
-                    /* Modulo: larger % smaller (2-cell only) */
-                    long larger = cluevals[j] > grid[i] ? cluevals[j] : grid[i];
-                    long smaller = cluevals[j] <= grid[i] ? cluevals[j] : grid[i];
-                    cluevals[j] = smaller > 0 ? larger % smaller : 0;
-                } break;
-                case C_GCD:
-                    /* GCD: accumulate gcd(current, next) */
-                    cluevals[j] = gcd_helper(cluevals[j], grid[i]);
-                    break;
-                case C_LCM:
-                    /* LCM: accumulate lcm(current, next) */
-                    cluevals[j] = lcm_helper(cluevals[j], grid[i]);
-                    break;
-                case C_XOR:
-                    /* XOR: accumulate xor(current, next) - self-inverse */
-                    cluevals[j] ^= grid[i];
-                    break;
+                    case C_ADD:
+                        cluevals[j] += grid[i];
+                        break;
+                    case C_MUL:
+                        cluevals[j] *= grid[i];
+                        break;
+                    case C_SUB:
+                        cluevals[j] = labs(cluevals[j] - grid[i]);
+                        break;
+                    case C_DIV: {
+                        int d1 = (int)cluevals[j], d2 = grid[i];
+                        if (d1 == 0 || d2 == 0)
+                            cluevals[j] = 0;
+                        else
+                            cluevals[j] = d2 / d1 + d1 / d2; /* one is 0 :-) */
+                    } break;
+                    case C_EXP: {
+                        /* Exponentiation: smaller^larger (base^exp) */
+                        long base, exp_val;
+                        long result = 1;
+                        int e;
+                        if (cluevals[j] <= grid[i]) {
+                            base = cluevals[j];
+                            exp_val = grid[i];
+                        } else {
+                            base = grid[i];
+                            exp_val = cluevals[j];
+                        }
+                        for (e = 0; e < exp_val; e++) result *= base;
+                        cluevals[j] = result;
+                    } break;
+                    case C_MOD: {
+                        /* Modulo: larger % smaller (2-cell only) */
+                        long larger = cluevals[j] > grid[i] ? cluevals[j] : grid[i];
+                        long smaller = cluevals[j] <= grid[i] ? cluevals[j] : grid[i];
+                        cluevals[j] = smaller > 0 ? larger % smaller : 0;
+                    } break;
+                    case C_GCD:
+                        /* GCD: accumulate gcd(current, next) */
+                        cluevals[j] = gcd_helper(cluevals[j], grid[i]);
+                        break;
+                    case C_LCM:
+                        /* LCM: accumulate lcm(current, next) */
+                        cluevals[j] = lcm_helper(cluevals[j], grid[i]);
+                        break;
+                    case C_XOR:
+                        /* XOR: accumulate xor(current, next) - self-inverse */
+                        cluevals[j] ^= grid[i];
+                        break;
                 }
             }
         }
@@ -1903,7 +1839,7 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
          * level, but not at the one below.
          */
         if (diff > 0) {
-            memset(soln, 0, a);
+            memset(soln, 0, (size_t)a * sizeof(digit));
             ret = solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
             if (ret <= diff - 1) {
                 /*
@@ -1912,24 +1848,23 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                  * interactions, often requiring more advanced techniques.
                  */
                 int merge_attempts = 0;
-                int max_merges = w * 2;  /* Limit merge iterations */
+                int max_merges = w * 2; /* Limit merge iterations */
 
                 while (merge_attempts < max_merges && ret <= diff - 1) {
                     if (!try_merge_cages(w, dsf, grid, clues, cluevals, maxblk, rs)) {
-                        break;  /* No more merges possible */
+                        break; /* No more merges possible */
                     }
                     merge_attempts++;
 
                     /* Re-test difficulty after merge */
-                    memset(soln, 0, a);
+                    memset(soln, 0, (size_t)a * sizeof(digit));
                     ret = solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
                 }
 
-                if (ret <= diff - 1)
-                    continue;  /* Still too easy after merging - new attempt */
+                if (ret <= diff - 1) continue; /* Still too easy after merging - new attempt */
             }
         }
-        memset(soln, 0, a);
+        memset(soln, 0, (size_t)a * sizeof(digit));
         ret = solver(w, dsf, clues, soln, diff, params->mode_flags);
         if (ret != diff) {
             /*
@@ -1947,13 +1882,12 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
                         break;
                     }
                     merge_attempts++;
-                    memset(soln, 0, a);
+                    memset(soln, 0, (size_t)a * sizeof(digit));
                     ret = solver(w, dsf, clues, soln, diff, params->mode_flags);
                 }
             }
 
-            if (ret != diff)
-                continue; /* go round again */
+            if (ret != diff) continue; /* go round again */
         }
 
         /*
@@ -1975,7 +1909,7 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
         sfree(clues);
         sfree(cluevals);
         sfree(soln);
-        return NULL;
+        return nullptr;
     }
 
     /*
@@ -1988,8 +1922,7 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
     for (i = 0; i < a; i++) {
         j = dsf_canonify(dsf, i);
         p += sprintf(p, "%02d", j);
-        if (i < a - 1)
-            *p++ = ',';
+        if (i < a - 1) *p++ = ',';
     }
 
     *p++ = ';';
@@ -1998,33 +1931,33 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
         j = dsf_canonify(dsf, i);
         if (j == i) {
             switch (clues[j] & CMASK) {
-            case C_ADD:
-                *p++ = 'a';
-                break;
-            case C_SUB:
-                *p++ = 's';
-                break;
-            case C_MUL:
-                *p++ = 'm';
-                break;
-            case C_DIV:
-                *p++ = 'd';
-                break;
-            case C_EXP:
-                *p++ = 'e';
-                break;
-            case C_MOD:
-                *p++ = 'o';  /* 'o' for m'o'dulo, 'm' taken by MUL */
-                break;
-            case C_GCD:
-                *p++ = 'g';
-                break;
-            case C_LCM:
-                *p++ = 'l';
-                break;
-            case C_XOR:
-                *p++ = 'x';  /* XOR: x ⊕ y notation */
-                break;
+                case C_ADD:
+                    *p++ = 'a';
+                    break;
+                case C_SUB:
+                    *p++ = 's';
+                    break;
+                case C_MUL:
+                    *p++ = 'm';
+                    break;
+                case C_DIV:
+                    *p++ = 'd';
+                    break;
+                case C_EXP:
+                    *p++ = 'e';
+                    break;
+                case C_MOD:
+                    *p++ = 'o'; /* 'o' for m'o'dulo, 'm' taken by MUL */
+                    break;
+                case C_GCD:
+                    *p++ = 'g';
+                    break;
+                case C_LCM:
+                    *p++ = 'l';
+                    break;
+                case C_XOR:
+                    *p++ = 'x'; /* XOR: x ⊕ y notation */
+                    break;
             }
             p += sprintf(p, "%05ld", clues[j] & ~CMASK);
 
@@ -2038,43 +1971,32 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
     desc = sresize(desc, p - desc, char);
 
     /*
-     * Encode the solution with mode-specific transformations.
-     *
-     * Internal grid is always 1..N. Apply display transformations:
-     * - Zero mode: output 0..N-1 (subtract 1)
-     * - Negative mode: output as signed values (-N/2 to +N/2 excluding 0)
-     * - Standard: output 1..N as-is
-     *
-     * For grids > 9, use hex digits (A=10, B=11, etc.)
+     * Encode the solution in aux.
      */
-    assert(memcmp(soln, grid, a) == 0);
-    *aux = snewn(a * 3 + 2, char);  /* Extra space for negative signs */
-
+    *aux = snewn(a + 2, char);
     char *auxp = *aux;
+    *auxp++ = 'S'; /* Solution marker */
     for (i = 0; i < a; i++) {
         int display_val = soln[i];
-
+        
+        /* Apply mode-specific display transformations */
         if (HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE)) {
-            display_val = soln[i] - 1;  /* 1..N -> 0..N-1 */
+            display_val -= 1; /* 1..N -> 0..N-1 */
         } else if (HAS_MODE(params->mode_flags, MODE_NEGATIVE)) {
-            int neg_count = w / 2;
-            if (soln[i] <= neg_count)
-                display_val = soln[i] - neg_count - 1;  /* 1..neg_count -> -neg_count..-1 */
-            else
-                display_val = soln[i] - neg_count;      /* neg_count+1..N -> 1..N-neg_count */
+            int range = w;
+            int half = range / 2;
+            /* 1..N -> -half..+(range-half-1) */
+            /* e.g. size 5: 1,2,3,4,5 -> -2,-1,0,1,2 */
+            display_val -= (half + 1);
         }
 
-        /* Encode value: use hex for 10+, handle negatives */
-        if (display_val < 0) {
-            *auxp++ = 'n';  /* Negative prefix */
-            *auxp++ = '0' + (-display_val);
-        } else if (display_val >= 10) {
-            *auxp++ = 'A' + (display_val - 10);
-        } else {
-            *auxp++ = '0' + display_val;
-        }
+        if (display_val >= 10)
+            *auxp++ = (char)('A' + (display_val - 10));
+        else if (display_val >= 0)
+            *auxp++ = (char)('0' + display_val);
+        else 
+            *auxp++ = '?'; /* Should not happen with valid modes */
     }
-    *auxp++ = 'e';
     *auxp = '\0';
     *aux = sresize(*aux, auxp - *aux + 1, char);
 
@@ -2090,8 +2012,9 @@ char *new_game_desc(const game_params *params, random_state *rs, char **aux, int
     return desc;
 }
 
-char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit *input_grid,
-                              char **aux, int interactive) {
+char* new_game_desc_from_grid(const game_params* params, random_state* rs, digit* input_grid,
+                              char** aux, int interactive) {
+    (void)interactive;
     int w = params->w, a = w * w;
     digit *grid, *soln;
     int *order, *revorder, *singletons, *dsf;
@@ -2099,7 +2022,7 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
     int i, j, k, n, x, y, ret;
     int diff = params->diff;
     int maxblk = get_maxblk_for_diff(params->mode_flags, diff);
-    (void)get_minblk(params->mode_flags);  /* Reserved for future constraint validation */
+    (void)get_minblk(params->mode_flags); /* Reserved for future constraint validation */
     char *desc, *p;
 
     /*
@@ -2120,7 +2043,7 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
 
     /* Use the provided grid */
     grid = snewn(a, digit);
-    memcpy(grid, input_grid, a * sizeof(digit));
+    memcpy(grid, input_grid, (size_t)a * sizeof(digit));
 
     /*
      * NOTE: Zero-Inclusive and Negative modes apply DISPLAY transformations
@@ -2136,9 +2059,12 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
      * certain difficulty levels harder to achieve.
      */
     int difficulty_multiplier = 1;
-    if (diff >= DIFF_UNREASONABLE) difficulty_multiplier = 8;
-    else if (diff >= DIFF_EXTREME) difficulty_multiplier = 4;
-    else if (diff >= DIFF_HARD) difficulty_multiplier = 2;
+    if (diff >= DIFF_UNREASONABLE)
+        difficulty_multiplier = 8;
+    else if (diff >= DIFF_EXTREME)
+        difficulty_multiplier = 4;
+    else if (diff >= DIFF_HARD)
+        difficulty_multiplier = 2;
 
     int max_retries = 1000 * difficulty_multiplier;
     int attempts = 0;
@@ -2149,16 +2075,13 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
         /*
          * Divide the grid into arbitrarily sized blocks.
          */
-        for (i = 0; i < a; i++)
-            order[i] = i;
+        for (i = 0; i < a; i++) order[i] = i;
 
         shuffle(order, a, sizeof(*order), rs);
 
-        for (i = 0; i < a; i++)
-            revorder[order[i]] = i;
+        for (i = 0; i < a; i++) revorder[order[i]] = i;
 
-        for (i = 0; i < a; i++)
-            singletons[i] = TRUE;
+        for (i = 0; i < a; i++) singletons[i] = true;
 
         dsf_init(dsf, a);
 
@@ -2185,7 +2108,7 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                     best = i + w;
 
                 if (best >= 0 && random_upto(rs, 4)) {
-                    singletons[i] = singletons[best] = FALSE;
+                    singletons[i] = singletons[best] = false;
                     dsf_merge(dsf, i, best);
                 }
             }
@@ -2216,7 +2139,7 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                     best = i + w;
 
                 if (best >= 0) {
-                    singletons[i] = singletons[best] = FALSE;
+                    singletons[i] = singletons[best] = false;
                     dsf_merge(dsf, i, best);
                 }
             }
@@ -2224,11 +2147,9 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
 
         /* Quit and start again if we have any singletons left over */
         for (i = 0; i < a; i++)
-            if (singletons[i])
-                break;
+            if (singletons[i]) break;
 
-        if (i < a)
-            continue;
+        if (i < a) continue;
 
         /*
          * Decide acceptable clues for each block.
@@ -2237,12 +2158,12 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
 #define F_SUB 0x002
 #define F_MUL 0x004
 #define F_DIV 0x008
-#define F_EXP 0x010  /* Exponentiation: base^exp */
-#define F_MOD 0x020  /* Modulo: larger % smaller */
-#define F_GCD 0x040  /* Greatest common divisor */
-#define F_LCM 0x080  /* Least common multiple */
-#define F_XOR 0x100  /* Bitwise XOR (high ambiguity) */
-#define BAD_SHIFT 9  /* Increased for 9+ clue types */
+#define F_EXP 0x010 /* Exponentiation: base^exp */
+#define F_MOD 0x020 /* Modulo: larger % smaller */
+#define F_GCD 0x040 /* Greatest common divisor */
+#define F_LCM 0x080 /* Least common multiple */
+#define F_XOR 0x100 /* Bitwise XOR (high ambiguity) */
+#define BAD_SHIFT 9 /* Increased for 9+ clue types */
 
         for (i = 0; i < a; i++) {
             singletons[i] = 0;
@@ -2253,41 +2174,38 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
             else if (j == i && k > 2) {
                 singletons[j] |= F_ADD | F_MUL;
                 /* XOR works great on N-cell cages with MODE_BITWISE */
-                if (HAS_MODE(params->mode_flags, MODE_BITWISE))
-                    singletons[j] |= F_XOR;
+                if (HAS_MODE(params->mode_flags, MODE_BITWISE)) singletons[j] |= F_XOR;
             } else if (j != i && k == 2) {
-                int p = grid[j], q = grid[i], v;
-                if (p < q) {
-                    int t = p;
-                    p = q;
+                int p_val = grid[j], q = grid[i], v;
+                if (p_val < q) {
+                    int t = p_val;
+                    p_val = q;
                     q = t;
                 }
 
-                v = p + q;
+                v = p_val + q;
                 if (v > 4 && v < 2 * w - 2)
                     singletons[j] |= F_ADD;
                 else
                     singletons[j] |= F_ADD << BAD_SHIFT;
 
-                v = p * q;
+                v = p_val * q;
                 n = 0;
                 for (k = 1; k <= w; k++)
-                    if (v % k == 0 && v / k <= w && v / k != k)
-                        n++;
+                    if (v % k == 0 && v / k <= w && v / k != k) n++;
                 if (n <= 2 && diff > DIFF_NORMAL)
                     singletons[j] |= F_MUL << BAD_SHIFT;
                 else
                     singletons[j] |= F_MUL;
 
-                v = p - q;
-                if (v < w - 1)
-                    singletons[j] |= F_SUB;
+                v = p_val - q;
+                if (v < w - 1) singletons[j] |= F_SUB;
 
                 /* Division: disabled in Zero-Inclusive, Negative, and Modular modes */
                 if (!HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE) &&
                     !HAS_MODE(params->mode_flags, MODE_NEGATIVE) &&
-                    !HAS_MODE(params->mode_flags, MODE_MODULAR) &&
-                    p % q == 0 && 2 * (p / q) <= w)
+                    !HAS_MODE(params->mode_flags, MODE_MODULAR) && p_val % q == 0 &&
+                    2 * (p_val / q) <= w)
                     singletons[j] |= F_DIV;
 
                 /* Exponentiation: only when mode is enabled */
@@ -2296,91 +2214,87 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                     int valid = 1;
                     int e;
                     for (e = 0; e < q && valid; e++) {
-                        exp_val *= p;
+                        exp_val *= p_val;
                         if (exp_val > 10000) valid = 0;
                     }
-                    if (valid && exp_val <= 10000)
-                        singletons[j] |= F_EXP;
+                    if (valid && exp_val <= 10000) singletons[j] |= F_EXP;
                 }
 
                 /* Number Theory operations: only when mode is enabled */
                 if (HAS_MODE(params->mode_flags, MODE_NUMBER_THEORY)) {
                     /* Modulo: larger % smaller, only if result is non-zero */
-                    v = p % q;
-                    if (v > 0 && v < w)
-                        singletons[j] |= F_MOD;
+                    v = p_val % q;
+                    if (v > 0 && v < w) singletons[j] |= F_MOD;
 
                     /* GCD: greatest common divisor */
-                    v = (int)gcd_helper(p, q);
-                    if (v >= 1 && v <= w)
-                        singletons[j] |= F_GCD;
+                    v = (int)gcd_helper(p_val, q);
+                    if (v >= 1 && v <= w) singletons[j] |= F_GCD;
 
                     /* LCM: least common multiple (if not too large) */
-                    v = (int)lcm_helper(p, q);
-                    if (v > 0 && v <= 100)  /* LCM can grow large */
+                    v = (int)lcm_helper(p_val, q);
+                    if (v > 0 && v <= 100) /* LCM can grow large */
                         singletons[j] |= F_LCM;
                 }
 
                 /* XOR: available when MODE_BITWISE is active */
                 if (HAS_MODE(params->mode_flags, MODE_BITWISE)) {
-                    v = p ^ q;
+                    v = p_val ^ q;
                     if (diff >= DIFF_HARD)
-                        singletons[j] |= F_XOR;  /* Always good at hard+ */
+                        singletons[j] |= F_XOR; /* Always good at hard+ */
                     else
-                        singletons[j] |= F_XOR << BAD_SHIFT;  /* Too ambiguous for easy */
+                        singletons[j] |= F_XOR << BAD_SHIFT; /* Too ambiguous for easy */
                 }
             }
         }
 
         /* Choose clues */
         shuffle(order, a, sizeof(*order), rs);
-        for (i = 0; i < a; i++)
-            clues[i] = 0;
+        for (i = 0; i < a; i++) clues[i] = 0;
         while (1) {
-            int done_something = FALSE;
+            int done_something = false;
 
             for (k = 0; k < 9; k++) {
                 long clue;
                 int good, bad;
                 switch (k) {
-                case 0:
-                    clue = C_DIV;
-                    good = F_DIV;
-                    break;
-                case 1:
-                    clue = C_SUB;
-                    good = F_SUB;
-                    break;
-                case 2:
-                    clue = C_MUL;
-                    good = F_MUL;
-                    break;
-                case 3:
-                    clue = C_ADD;
-                    good = F_ADD;
-                    break;
-                case 4:
-                    clue = C_EXP;
-                    good = F_EXP;
-                    break;
-                case 5:
-                    clue = C_MOD;
-                    good = F_MOD;
-                    break;
-                case 6:
-                    clue = C_GCD;
-                    good = F_GCD;
-                    break;
-                case 7:
-                    clue = C_LCM;
-                    good = F_LCM;
-                    break;
-                case 8:
-                    clue = C_XOR;
-                    good = F_XOR;
-                    break;
-                default:
-                    continue;  /* Safety fallback */
+                    case 0:
+                        clue = C_DIV;
+                        good = F_DIV;
+                        break;
+                    case 1:
+                        clue = C_SUB;
+                        good = F_SUB;
+                        break;
+                    case 2:
+                        clue = C_MUL;
+                        good = F_MUL;
+                        break;
+                    case 3:
+                        clue = C_ADD;
+                        good = F_ADD;
+                        break;
+                    case 4:
+                        clue = C_EXP;
+                        good = F_EXP;
+                        break;
+                    case 5:
+                        clue = C_MOD;
+                        good = F_MOD;
+                        break;
+                    case 6:
+                        clue = C_GCD;
+                        good = F_GCD;
+                        break;
+                    case 7:
+                        clue = C_LCM;
+                        good = F_LCM;
+                        break;
+                    case 8:
+                        clue = C_XOR;
+                        good = F_XOR;
+                        break;
+                    default:
+                        continue; /* Safety fallback */
                 }
 
                 for (i = 0; i < a; i++) {
@@ -2402,12 +2316,10 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                         }
                     }
                 }
-                if (i < a)
-                    done_something = TRUE;
+                if (i < a) done_something = true;
             }
 
-            if (!done_something)
-                break;
+            if (!done_something) break;
         }
 #undef F_ADD
 #undef F_SUB
@@ -2427,56 +2339,55 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                 cluevals[j] = grid[i];
             } else {
                 switch (clues[j]) {
-                case C_ADD:
-                    cluevals[j] += grid[i];
-                    break;
-                case C_MUL:
-                    cluevals[j] *= grid[i];
-                    break;
-                case C_SUB:
-                    cluevals[j] = labs(cluevals[j] - grid[i]);
-                    break;
-                case C_DIV: {
-                    int d1 = cluevals[j], d2 = grid[i];
-                    if (d1 == 0 || d2 == 0)
-                        cluevals[j] = 0;
-                    else
-                        cluevals[j] = d2 / d1 + d1 / d2;
-                } break;
-                case C_EXP: {
-                    /* Exponentiation: smaller^larger (base^exp) */
-                    long base, exp_val;
-                    long result = 1;
-                    int e;
-                    if (cluevals[j] <= grid[i]) {
-                        base = cluevals[j];
-                        exp_val = grid[i];
-                    } else {
-                        base = grid[i];
-                        exp_val = cluevals[j];
-                    }
-                    for (e = 0; e < exp_val; e++)
-                        result *= base;
-                    cluevals[j] = result;
-                } break;
-                case C_MOD: {
-                    /* Modulo: larger % smaller (2-cell only) */
-                    long larger = cluevals[j] > grid[i] ? cluevals[j] : grid[i];
-                    long smaller = cluevals[j] <= grid[i] ? cluevals[j] : grid[i];
-                    cluevals[j] = smaller > 0 ? larger % smaller : 0;
-                } break;
-                case C_GCD:
-                    /* GCD: accumulate gcd(current, next) */
-                    cluevals[j] = gcd_helper(cluevals[j], grid[i]);
-                    break;
-                case C_LCM:
-                    /* LCM: accumulate lcm(current, next) */
-                    cluevals[j] = lcm_helper(cluevals[j], grid[i]);
-                    break;
-                case C_XOR:
-                    /* XOR: accumulate xor(current, next) - self-inverse */
-                    cluevals[j] ^= grid[i];
-                    break;
+                    case C_ADD:
+                        cluevals[j] += grid[i];
+                        break;
+                    case C_MUL:
+                        cluevals[j] *= grid[i];
+                        break;
+                    case C_SUB:
+                        cluevals[j] = labs(cluevals[j] - grid[i]);
+                        break;
+                    case C_DIV: {
+                        int d1 = (int)cluevals[j], d2 = grid[i];
+                        if (d1 == 0 || d2 == 0)
+                            cluevals[j] = 0;
+                        else
+                            cluevals[j] = d2 / d1 + d1 / d2;
+                    } break;
+                    case C_EXP: {
+                        /* Exponentiation: smaller^larger (base^exp) */
+                        long base, exp_val;
+                        long result = 1;
+                        int e;
+                        if (cluevals[j] <= grid[i]) {
+                            base = cluevals[j];
+                            exp_val = grid[i];
+                        } else {
+                            base = grid[i];
+                            exp_val = cluevals[j];
+                        }
+                        for (e = 0; e < exp_val; e++) result *= base;
+                        cluevals[j] = result;
+                    } break;
+                    case C_MOD: {
+                        /* Modulo: larger % smaller (2-cell only) */
+                        long larger = cluevals[j] > grid[i] ? cluevals[j] : grid[i];
+                        long smaller = cluevals[j] <= grid[i] ? cluevals[j] : grid[i];
+                        cluevals[j] = smaller > 0 ? larger % smaller : 0;
+                    } break;
+                    case C_GCD:
+                        /* GCD: accumulate gcd(current, next) */
+                        cluevals[j] = gcd_helper(cluevals[j], grid[i]);
+                        break;
+                    case C_LCM:
+                        /* LCM: accumulate lcm(current, next) */
+                        cluevals[j] = lcm_helper(cluevals[j], grid[i]);
+                        break;
+                    case C_XOR:
+                        /* XOR: accumulate xor(current, next) - self-inverse */
+                        cluevals[j] ^= grid[i];
+                        break;
                 }
             }
         }
@@ -2498,7 +2409,7 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
          * Use cage merging to elevate difficulty when too easy.
          */
         if (diff > 0) {
-            memset(soln, 0, a * sizeof(digit));
+            memset(soln, 0, (size_t)a * sizeof(digit));
             ret = solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
             if (ret <= diff - 1) {
                 /* Too easy - try cage merging */
@@ -2510,15 +2421,14 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                         break;
                     }
                     merge_attempts++;
-                    memset(soln, 0, a * sizeof(digit));
+                    memset(soln, 0, (size_t)a * sizeof(digit));
                     ret = solver(w, dsf, clues, soln, diff - 1, params->mode_flags);
                 }
 
-                if (ret <= diff - 1)
-                    continue;
+                if (ret <= diff - 1) continue;
             }
         }
-        memset(soln, 0, a * sizeof(digit));
+        memset(soln, 0, (size_t)a * sizeof(digit));
         ret = solver(w, dsf, clues, soln, diff, params->mode_flags);
         if (ret != diff) {
             if (ret < diff) {
@@ -2531,13 +2441,12 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
                         break;
                     }
                     merge_attempts++;
-                    memset(soln, 0, a * sizeof(digit));
+                    memset(soln, 0, (size_t)a * sizeof(digit));
                     ret = solver(w, dsf, clues, soln, diff, params->mode_flags);
                 }
             }
 
-            if (ret != diff)
-                continue;
+            if (ret != diff) continue;
         }
 
         /* Success! */
@@ -2566,8 +2475,7 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
     for (i = 0; i < a; i++) {
         j = dsf_canonify(dsf, i);
         p += sprintf(p, "%02d", j);
-        if (i < a - 1)
-            *p++ = ',';
+        if (i < a - 1) *p++ = ',';
     }
 
     *p++ = ';';
@@ -2576,33 +2484,33 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
         j = dsf_canonify(dsf, i);
         if (j == i) {
             switch (clues[j] & CMASK) {
-            case C_ADD:
-                *p++ = 'a';
-                break;
-            case C_SUB:
-                *p++ = 's';
-                break;
-            case C_MUL:
-                *p++ = 'm';
-                break;
-            case C_DIV:
-                *p++ = 'd';
-                break;
-            case C_EXP:
-                *p++ = 'e';
-                break;
-            case C_MOD:
-                *p++ = 'o';  /* 'o' for m'o'dulo */
-                break;
-            case C_GCD:
-                *p++ = 'g';
-                break;
-            case C_LCM:
-                *p++ = 'l';
-                break;
-            case C_XOR:
-                *p++ = 'x';  /* XOR: x ⊕ y notation */
-                break;
+                case C_ADD:
+                    *p++ = 'a';
+                    break;
+                case C_SUB:
+                    *p++ = 's';
+                    break;
+                case C_MUL:
+                    *p++ = 'm';
+                    break;
+                case C_DIV:
+                    *p++ = 'd';
+                    break;
+                case C_EXP:
+                    *p++ = 'e';
+                    break;
+                case C_MOD:
+                    *p++ = 'o'; /* 'o' for m'o'dulo */
+                    break;
+                case C_GCD:
+                    *p++ = 'g';
+                    break;
+                case C_LCM:
+                    *p++ = 'l';
+                    break;
+                case C_XOR:
+                    *p++ = 'x'; /* XOR: x ⊕ y notation */
+                    break;
             }
             p += sprintf(p, "%05ld", clues[j] & ~CMASK);
             *p++ = ',';
@@ -2615,15 +2523,15 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
     desc = sresize(desc, p - desc, char);
 
     /* Encode solution with mode-specific transformations */
-    assert(memcmp(soln, grid, a * sizeof(digit)) == 0);
-    *aux = snewn(a * 3 + 2, char);  /* Extra space for negative signs */
+    assert(memcmp(soln, grid, (size_t)a * sizeof(digit)) == 0);
+    *aux = snewn(a * 3 + 2, char); /* Extra space for negative signs */
 
-    char *auxp = *aux;
+    char* auxp = *aux;
     for (i = 0; i < a; i++) {
         int display_val = soln[i];
 
         if (HAS_MODE(params->mode_flags, MODE_ZERO_INCLUSIVE)) {
-            display_val = soln[i] - 1;  /* 1..N -> 0..N-1 */
+            display_val = soln[i] - 1; /* 1..N -> 0..N-1 */
         } else if (HAS_MODE(params->mode_flags, MODE_NEGATIVE)) {
             int neg_count = w / 2;
             if (soln[i] <= neg_count)
@@ -2634,12 +2542,10 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
 
         /* Encode value: use hex for 10+, handle negatives */
         if (display_val < 0) {
-            *auxp++ = 'n';  /* Negative prefix */
-            *auxp++ = '0' + (-display_val);
-        } else if (display_val >= 10) {
-            *auxp++ = 'A' + (display_val - 10);
+            *auxp++ = 'n'; /* Negative prefix */
+            *auxp++ = (char)('A' + (display_val - 10));
         } else {
-            *auxp++ = '0' + display_val;
+            *auxp++ = (char)('0' + (-display_val));
         }
     }
     *auxp++ = 'e';
@@ -2657,7 +2563,6 @@ char *new_game_desc_from_grid(const game_params *params, random_state *rs, digit
 
     return desc;
 }
-
 
 /* ======================================================================
  * LEGACY DESKTOP GUI CODE REMOVED

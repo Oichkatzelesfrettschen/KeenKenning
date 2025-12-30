@@ -140,6 +140,7 @@ class GameViewModel : ViewModel() {
                 gameMode = gameMode
             )
         }
+        // refreshState() updates cells, zones, activeCell, and isInputtingNotes based on the model
         refreshState()
 
         // Start timer (for new game it starts at 0, for resumed game it continues from preserved time)
@@ -183,6 +184,7 @@ class GameViewModel : ViewModel() {
         timerJob?.cancel()
         timerJob = null
         _uiState.update { it.copy(timerRunning = false) }
+        saveAutoSave()
     }
 
     fun pauseTimer() {
@@ -344,6 +346,7 @@ class GameViewModel : ViewModel() {
         
         model.puzzleWon()
         refreshState()
+        saveAutoSave()
 
         // Trigger victory animation if solved
         if (model.puzzleWon && !_uiState.value.showVictoryAnimation) {
@@ -367,12 +370,14 @@ class GameViewModel : ViewModel() {
         val model = keenModel ?: return
         model.undoOneStep()
         refreshState()
+        saveAutoSave()
     }
     
     fun toggleNoteMode() {
         val model = keenModel ?: return
         model.toggleFinalGuess()
         refreshState()
+        saveAutoSave()
     }
     
     fun toggleSmartHints() {
@@ -501,6 +506,7 @@ class GameViewModel : ViewModel() {
         model.clearFinal(x, y)
         model.clearGuesses(x, y)
         refreshState()
+        saveAutoSave()
     }
 
     // Save/Load dialog toggles
@@ -533,6 +539,29 @@ class GameViewModel : ViewModel() {
             _uiState.update { it.copy(showSaveDialog = false) }
         }
         return result
+    }
+
+    private fun saveAutoSave() {
+        val model = keenModel ?: return
+        val manager = saveManager ?: return
+        // Don't auto-save if solved (user might want to replay or it's done)
+        // But actually, we DO want to save "solved" state so they don't lose the victory screen.
+        manager.saveAutoSave(
+            model = model,
+            difficultyName = _uiState.value.difficultyName,
+            elapsedSeconds = getElapsedTimeForSave()
+        )
+    }
+
+    fun loadAutoSave(): Boolean {
+        val manager = saveManager ?: return false
+        val (model, elapsed) = manager.loadAutoSave()
+        if (model != null) {
+            // Restore implicit state
+            loadModel(model, preservedElapsedSeconds = elapsed)
+            return true
+        }
+        return false
     }
 
     // Load game from slot

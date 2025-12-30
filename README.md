@@ -61,23 +61,27 @@ Easy • Normal • Hard • Insane • Ludicrous
 ## Building from Source
 
 ### Prerequisites
-- JDK 21 (required by Gradle 8.6)
-- Android SDK with API 35
-- Android NDK 27.x
+- **JDK 21** (Required by Gradle 8.6+)
+- **Android SDK** with API 35 (Compile SDK)
+- **Android NDK** 27.x
+- **CMake** 3.22.1+ (Enforcing **C11** standard)
+- **Memory**: 4GB+ heap recommended for Gradle daemon
 
 ### Build Commands
 ```bash
-# Debug build
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleDebug
+# Clean build (Recommended for strict mode)
+./gradlew clean assembleKenningDebug
+
+# Run Unit Tests (Strict warnings-as-errors)
+./gradlew testKenningDebugUnitTest
 
 # Release build
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleRelease
-
-# Clean build
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew clean assembleDebug
+./gradlew assembleKenningRelease
 ```
 
-Output: `app/build/outputs/apk/debug/`
+> **Note**: This project uses `allWarningsAsErrors = true`. Any code warnings will fail the build to ensure high quality.
+
+Output: `app/build/outputs/apk/kenning/debug/`
 
 ## Architecture
 

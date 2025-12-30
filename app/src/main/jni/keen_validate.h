@@ -20,21 +20,21 @@
  * Error flags for each cell. Multiple flags can be set simultaneously.
  * These are designed for efficient bitwise OR in the UI layer.
  */
-#define VALID_OK          0x00  /* No errors detected */
-#define VALID_ERR_ROW     0x01  /* Duplicate in row */
-#define VALID_ERR_COL     0x02  /* Duplicate in column */
-#define VALID_ERR_CAGE    0x04  /* Cage constraint violated */
+#define VALID_OK 0x00       /* No errors detected */
+#define VALID_ERR_ROW 0x01  /* Duplicate in row */
+#define VALID_ERR_COL 0x02  /* Duplicate in column */
+#define VALID_ERR_CAGE 0x04 /* Cage constraint violated */
 
 /*
  * Validation context passed from JNI layer.
  * Encapsulates all puzzle state needed for validation.
  */
 typedef struct {
-    int w;              /* Grid width/height */
-    digit *grid;        /* Current cell values (0 = empty) */
-    int *dsf;           /* Disjoint set forest for cage membership */
-    long *clues;        /* Cage clues with operation encoded in upper bits */
-    int mode_flags;     /* Mode flags for special rules (e.g., MODE_KILLER) */
+    int w;          /* Grid width/height */
+    digit* grid;    /* Current cell values (0 = empty) */
+    int* dsf;       /* Disjoint set forest for cage membership */
+    long* clues;    /* Cage clues with operation encoded in upper bits */
+    int mode_flags; /* Mode flags for special rules (e.g., MODE_KILLER) */
 } validate_ctx;
 
 /*
@@ -47,7 +47,7 @@ typedef struct {
  * Returns:
  *   Total number of cells with errors (0 = puzzle is valid so far)
  */
-int kenken_validate_grid(const validate_ctx *ctx, int *errors);
+int kenken_validate_grid(const validate_ctx* ctx, int* errors);
 
 /*
  * Check if a specific cell has any errors.
@@ -60,7 +60,7 @@ int kenken_validate_grid(const validate_ctx *ctx, int *errors);
  * Returns:
  *   Bitmask of VALID_ERR_* flags for this cell
  */
-int kenken_validate_cell(const validate_ctx *ctx, int cell);
+int kenken_validate_cell(const validate_ctx* ctx, int cell);
 
 /*
  * Check if puzzle is complete and valid.
@@ -72,6 +72,6 @@ int kenken_validate_cell(const validate_ctx *ctx, int cell);
  *   1 if puzzle is completely filled and all constraints satisfied
  *   0 otherwise
  */
-int kenken_is_complete(const validate_ctx *ctx);
+int kenken_is_complete(const validate_ctx* ctx);
 
 #endif /* KENKEN_VALIDATE_H */

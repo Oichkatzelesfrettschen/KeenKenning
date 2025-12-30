@@ -87,11 +87,10 @@ done:
     sfree(inverse_elements);
 }*/
 
-void dsf_init(int *dsf, int size) {
+void dsf_init(int* dsf, int size) {
     int i;
 
-    for (i = 0; i < size; i++)
-        dsf[i] = 6;
+    for (i = 0; i < size; i++) dsf[i] = 6;
     /* Bottom bit of each element of this array stores whether that
      * element is opposite to its parent, which starts off as
      * false. Second bit of each element stores whether that element
@@ -100,10 +99,10 @@ void dsf_init(int *dsf, int size) {
      * bits are the number of elements in the tree.  */
 }
 
-int *snew_dsf(int size) {
-    int *ret;
+int* snew_dsf(int size) {
+    int* ret;
 
-    ret = snewn(size, int);
+    ret = snewn((size_t)size, int);
     dsf_init(ret, size);
 
     /*print_dsf(ret, size); */
@@ -111,19 +110,19 @@ int *snew_dsf(int size) {
     return ret;
 }
 
-int dsf_canonify(int *dsf, int index) {
-    return edsf_canonify(dsf, index, NULL);
+int dsf_canonify(int* dsf, int index) {
+    return edsf_canonify(dsf, index, nullptr);
 }
 
-void dsf_merge(int *dsf, int v1, int v2) {
-    edsf_merge(dsf, v1, v2, FALSE);
+void dsf_merge(int* dsf, int v1, int v2) {
+    edsf_merge(dsf, v1, v2, false);
 }
 
-int dsf_size(int *dsf, int index) {
+int dsf_size(int* dsf, int index) {
     return dsf[dsf_canonify(dsf, index)] >> 2;
 }
 
-int edsf_canonify(int *dsf, int index, int *inverse_return) {
+int edsf_canonify(int* dsf, int index, int* inverse_return) {
     int start_index = index, canonical_index;
     int inverse = 0;
 
@@ -143,8 +142,7 @@ int edsf_canonify(int *dsf, int index, int *inverse_return) {
     }
     canonical_index = index;
 
-    if (inverse_return)
-        *inverse_return = inverse;
+    if (inverse_return) *inverse_return = inverse;
 
     /* Update every member of this 'equivalence class' to point directly at the
      * canonical member. */
@@ -164,7 +162,7 @@ int edsf_canonify(int *dsf, int index, int *inverse_return) {
     return index;
 }
 
-void edsf_merge(int *dsf, int v1, int v2, int inverse) {
+void edsf_merge(int* dsf, int v1, int v2, int inverse) {
     int i1, i2;
 
     /*    fprintf(stderr, "dsf = %p\n", dsf); */

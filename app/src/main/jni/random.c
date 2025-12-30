@@ -57,13 +57,12 @@ static void SHA_Core_Init(uint32 h[5]) {
     h[4] = 0xc3d2e1f0;
 }
 
-static void SHATransform(uint32 *digest, uint32 *block) {
+static void SHATransform(uint32* digest, uint32* block) {
     uint32 w[80];
     uint32 a, b, c, d, e;
     int t;
 
-    for (t = 0; t < 16; t++)
-        w[t] = block[t];
+    for (t = 0; t < 16; t++) w[t] = block[t];
 
     for (t = 16; t < 80; t++) {
         uint32 tmp = w[t - 3] ^ w[t - 8] ^ w[t - 14] ^ w[t - 16];
@@ -122,16 +121,16 @@ static void SHATransform(uint32 *digest, uint32 *block) {
  * the end, and pass those blocks to the core SHA algorithm.
  */
 
-void SHA_Init(SHA_State *s) {
+void SHA_Init(SHA_State* s) {
     SHA_Core_Init(s->h);
     s->blkused = 0;
     s->lenhi = s->lenlo = 0;
 }
 
-void SHA_Bytes(SHA_State *s, const void *p, int len) {
-    unsigned char *q = (unsigned char *)p;
+void SHA_Bytes(SHA_State* s, const void* p, int len) {
+    unsigned char* q = (unsigned char*)p;
     uint32 wordblock[16];
-    uint32 lenw = len;
+    uint32 lenw = (uint32)len;
     int i;
 
     /*
@@ -144,14 +143,14 @@ void SHA_Bytes(SHA_State *s, const void *p, int len) {
         /*
          * Trivial case: just add to the block.
          */
-        memcpy(s->block + s->blkused, q, len);
+        memcpy(s->block + s->blkused, q, (size_t)len);
         s->blkused += len;
     } else {
         /*
          * We must complete and process at least one block.
          */
         while (s->blkused + len >= 64) {
-            memcpy(s->block + s->blkused, q, 64 - s->blkused);
+            memcpy(s->block + s->blkused, q, (size_t)(64 - s->blkused));
             q += 64 - s->blkused;
             len -= 64 - s->blkused;
             /* Now process the block. Gather bytes big-endian into words */
@@ -163,12 +162,12 @@ void SHA_Bytes(SHA_State *s, const void *p, int len) {
             SHATransform(s->h, wordblock);
             s->blkused = 0;
         }
-        memcpy(s->block, q, len);
+        memcpy(s->block, q, (size_t)len);
         s->blkused = len;
     }
 }
 
-void SHA_Final(SHA_State *s, unsigned char *output) {
+void SHA_Final(SHA_State* s, unsigned char* output) {
     int i;
     int pad;
     unsigned char c[64];
@@ -182,7 +181,7 @@ void SHA_Final(SHA_State *s, unsigned char *output) {
     lenhi = (s->lenhi << 3) | (s->lenlo >> (32 - 3));
     lenlo = (s->lenlo << 3);
 
-    memset(c, 0, pad);
+    memset(c, 0, (size_t)pad);
     c[0] = 0x80;
     SHA_Bytes(s, &c, pad);
 
@@ -205,7 +204,7 @@ void SHA_Final(SHA_State *s, unsigned char *output) {
     }
 }
 
-void SHA_Simple(const void *p, int len, unsigned char *output) {
+void SHA_Simple(const void* p, int len, unsigned char* output) {
     SHA_State s;
 
     SHA_Init(&s);
@@ -223,8 +222,8 @@ struct random_state {
     int pos;
 };
 
-random_state *random_new(const char *seed, int len) {
-    random_state *state;
+random_state* random_new(const char* seed, int len) {
+    random_state* state;
 
     state = snew(random_state);
 
@@ -236,8 +235,8 @@ random_state *random_new(const char *seed, int len) {
     return state;
 }
 
-random_state *random_copy(random_state *tocopy) {
-    random_state *result;
+random_state* random_copy(random_state* tocopy) {
+    random_state* result;
     result = snew(random_state);
     memcpy(result->seedbuf, tocopy->seedbuf, sizeof(result->seedbuf));
     memcpy(result->databuf, tocopy->databuf, sizeof(result->databuf));
@@ -245,7 +244,7 @@ random_state *random_copy(random_state *tocopy) {
     return result;
 }
 
-unsigned long random_bits(random_state *state, int bits) {
+unsigned long random_bits(random_state* state, int bits) {
     unsigned long ret = 0;
     int n;
 
@@ -276,12 +275,11 @@ unsigned long random_bits(random_state *state, int bits) {
     return ret;
 }
 
-unsigned long random_upto(random_state *state, unsigned long limit) {
+unsigned long random_upto(random_state* state, unsigned long limit) {
     int bits = 0;
     unsigned long max, divisor, data;
 
-    while ((limit >> bits) != 0)
-        bits++;
+    while ((limit >> bits) != 0) bits++;
 
     bits += 3;
     assert(bits < 32);
@@ -297,11 +295,11 @@ unsigned long random_upto(random_state *state, unsigned long limit) {
     return data / divisor;
 }
 
-void random_free(random_state *state) {
+void random_free(random_state* state) {
     sfree(state);
 }
 
-char *random_state_encode(random_state *state) {
+char* random_state_encode(random_state* state) {
     char retbuf[256];
     int len = 0, i;
 
@@ -314,8 +312,8 @@ char *random_state_encode(random_state *state) {
     return dupstr(retbuf);
 }
 
-random_state *random_state_decode(const char *input) {
-    random_state *state;
+random_state* random_state_decode(const char* input) {
+    random_state* state;
     int pos, byte, digits;
 
     state = snew(random_state);
@@ -346,9 +344,9 @@ random_state *random_state_decode(const char *input) {
              * We have a byte. Put it somewhere.
              */
             if (pos < (int)lenof(state->seedbuf))
-                state->seedbuf[pos] = byte;
+                state->seedbuf[pos] = (unsigned char)byte;
             else if (pos < (int)lenof(state->seedbuf) + (int)lenof(state->databuf))
-                state->databuf[pos - lenof(state->seedbuf)] = byte;
+                state->databuf[(size_t)pos - lenof(state->seedbuf)] = (unsigned char)byte;
             else if (pos == (int)lenof(state->seedbuf) + (int)lenof(state->databuf) &&
                      byte <= (int)lenof(state->databuf))
                 state->pos = byte;

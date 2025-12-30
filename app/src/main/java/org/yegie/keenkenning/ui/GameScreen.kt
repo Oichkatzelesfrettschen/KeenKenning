@@ -72,6 +72,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import org.yegie.keenkenning.ui.theme.*
 import org.yegie.keenkenning.data.GameMode
 import kotlin.math.ceil
@@ -1013,37 +1014,29 @@ private fun AccessibleCellView(
     val colors = LocalGameColors.current
 
     // Zone-based background color for visual grouping
-    // Uses varied luminance so it works in grayscale too
-    // Transformed for colorblind accessibility when mode is active
     val zoneColor = remember(cell.zoneId, colorblindMode) {
         ZoneColors.forZone(cell.zoneId, highContrast = colorblindMode == ColorblindMode.HIGH_CONTRAST)
             .forColorblindMode(colorblindMode)
     }
 
-    // Selection uses both color AND thick border (never color alone)
-    // TV mode: extra-thick border for visibility on large screens
     val backgroundColor by animateColorAsState(
         targetValue = if (cell.isSelected) Color(0xFFD1C4E9) else zoneColor,
         animationSpec = tween(150),
         label = "cellBg"
     )
 
-    // TV mode: 4dp focus ring for visibility at 10-foot viewing distance
     val selectionBorderWidth = when {
-        cell.isSelected && isTv -> 4.dp  // Thick TV focus ring
-        cell.isSelected -> 3.dp          // Standard mobile selection
+        cell.isSelected && isTv -> 4.dp
+        cell.isSelected -> 3.dp
         else -> 0.dp
     }
-    // TV mode: high-contrast cyan for focus ring
     val selectionBorderColor = if (isTv) Color(0xFF00CED1) else Color(0xFF5E35B1)
 
-    // Cage borders - thick black lines provide non-color differentiation
     val cageBorderColor = Color(0xFF212121)
     val gridLineColor = Color(0xFFBDBDBD)
     val cageBorderWidth = dimensions.cageBorderWidth
     val gridBorderWidth = dimensions.gridBorderWidth
 
-    // Calculate text sizes based on puzzle size for readability
     val valueTextSize = when {
         puzzleSize <= 4 -> 28.sp
         puzzleSize <= 6 -> 24.sp
@@ -1065,7 +1058,6 @@ private fun AccessibleCellView(
     }
 
     BoxWithConstraints(
-        contentAlignment = Alignment.Center,
         modifier = modifier
             .background(backgroundColor)
             .then(
@@ -1079,9 +1071,7 @@ private fun AccessibleCellView(
             .drawBehind {
                 val w = size.width
                 val h = size.height
-
                 // Draw cage borders (thick) or grid lines (thin)
-                // Top
                 drawLine(
                     color = if (cell.borders.top) cageBorderColor else gridLineColor,
                     start = Offset(0f, 0f),
@@ -1089,8 +1079,6 @@ private fun AccessibleCellView(
                     strokeWidth = if (cell.borders.top) cageBorderWidth.toPx() else gridBorderWidth.toPx(),
                     cap = StrokeCap.Square
                 )
-
-                // Bottom
                 drawLine(
                     color = if (cell.borders.bottom) cageBorderColor else gridLineColor,
                     start = Offset(0f, h),
@@ -1098,8 +1086,6 @@ private fun AccessibleCellView(
                     strokeWidth = if (cell.borders.bottom) cageBorderWidth.toPx() else gridBorderWidth.toPx(),
                     cap = StrokeCap.Square
                 )
-
-                // Left
                 drawLine(
                     color = if (cell.borders.left) cageBorderColor else gridLineColor,
                     start = Offset(0f, 0f),
@@ -1107,8 +1093,6 @@ private fun AccessibleCellView(
                     strokeWidth = if (cell.borders.left) cageBorderWidth.toPx() else gridBorderWidth.toPx(),
                     cap = StrokeCap.Square
                 )
-
-                // Right
                 drawLine(
                     color = if (cell.borders.right) cageBorderColor else gridLineColor,
                     start = Offset(w, 0f),
@@ -1122,37 +1106,26 @@ private fun AccessibleCellView(
                 contentDescription = buildCellDescription(cell, puzzleSize)
             }
     ) {
-        // Cell dimensions available for proportional calculations
-        val cellHeight = maxHeight
-        val cellWidth = maxWidth
-
-        // Calculate proportional offsets based on actual cell size
-        val valueOffset = cellHeight * dimensions.valueVerticalOffsetRatio
-        val noteGridOffset = cellHeight * dimensions.noteGridOffsetRatio
-        val hintGridOffset = cellHeight * dimensions.hintGridOffsetRatio
-
-        // Layout zones to prevent overlap:
-        // - TopStart: Clue (cage constraint like "20x")
-        // - Center/BottomCenter: Main value or Smart Hints
-        // - BottomEnd: User notes (compact)
-
         val hasClue = cell.clue != null
+        // Capture maxWidth from BoxWithConstraintsScope for use in inner Box
+        val availableWidth = maxWidth
 
-        // Clue (cage constraint) - elevated surface for depth perception
-        // Uses theme colors for dark/light mode compatibility
-        if (cell.clue != null) {
+        // Z-Index Layer 1: Clue (Top-Left Quadrant Reservation)
+        if (hasClue) {
             Surface(
-                modifier = Modifier.align(Alignment.TopStart),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .zIndex(1f), // Ensure clue is above other content visually
                 shape = RoundedCornerShape(dimensions.clueBoxCornerRadius),
-                color = colors.surfaceDim,  // Theme-aware surface color
+                color = colors.surfaceDim,
                 shadowElevation = dimensions.clueBoxElevation,
                 tonalElevation = 1.dp
             ) {
                 Text(
-                    text = cell.clue,
+                    text = cell.clue!!,
                     fontSize = clueTextSize,
                     fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary,  // Theme-aware text color
+                    color = colors.textPrimary,
                     modifier = Modifier.padding(
                         horizontal = dimensions.clueBoxPaddingHorizontal,
                         vertical = dimensions.clueBoxPaddingVertical
@@ -1161,38 +1134,41 @@ private fun AccessibleCellView(
             }
         }
 
-        // Cell value - centered with proportional offset if clue present
-        if (cell.value != null && cell.value != -1) {
-            Text(
-                text = valueToDisplay(cell.value),
-                fontSize = valueTextSize,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary,  // Theme-aware text color
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(top = if (hasClue) valueOffset else 0.dp)
-            )
-        } else {
-            // Show Smart Hints or user notes - with proportional offsets
-            if (showHints && cell.smartHintProbs != null) {
-                SmartHintsGrid(
-                    probs = cell.smartHintProbs,
-                    textSize = noteTextSize,
-                    hasClue = hasClue,
-                    cellWidth = cellWidth,
-                    verticalOffset = hintGridOffset
+        // Z-Index Layer 0: Content (Value / Notes / Hints)
+        // If a clue exists, we constrain this content to the bottom/center area to avoid overlap.
+        // We use a Box that fills the cell but respects the "reserved" top area if needed.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = if (hasClue) 16.dp else 0.dp), // Reserve space for clue
+            contentAlignment = Alignment.Center
+        ) {
+            if (cell.value != null && cell.value != -1) {
+                // Main Value
+                Text(
+                    text = valueToDisplay(cell.value),
+                    fontSize = valueTextSize,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary,
+                    textAlign = TextAlign.Center
                 )
-            } else if (cell.notes.isNotEmpty() && cell.notes.any { it }) {
-                AccessibleNoteGrid(
-                    notes = cell.notes,
-                    textSize = noteTextSize,
-                    puzzleSize = puzzleSize,
-                    hasClue = hasClue,
-                    cellWidth = cellWidth,
-                    verticalOffset = noteGridOffset,
-                    noteBoxSizeRatio = dimensions.noteBoxSizeRatio
-                )
+            } else {
+                // Hints or Notes
+                if (showHints && cell.smartHintProbs != null) {
+                    SmartHintsGrid(
+                        probs = cell.smartHintProbs,
+                        textSize = noteTextSize,
+                        cellWidth = availableWidth
+                    )
+                } else if (cell.notes.isNotEmpty() && cell.notes.any { it }) {
+                    AccessibleNoteGrid(
+                        notes = cell.notes,
+                        textSize = noteTextSize,
+                        puzzleSize = puzzleSize,
+                        cellWidth = availableWidth,
+                        noteBoxSizeRatio = dimensions.noteBoxSizeRatio
+                    )
+                }
             }
         }
     }
@@ -1212,43 +1188,21 @@ private fun buildCellDescription(cell: UiCell, puzzleSize: Int = 9): String {
 
 /**
  * Smart Hints Grid - displays ML-computed probability hints
- * Uses both opacity AND font weight to indicate confidence level
- * (provides non-color indication for accessibility)
- * Always centered - only shown when no value is entered
- *
- * @param probs List of probabilities for each digit
- * @param textSize Base text size for hints
- * @param hasClue Whether this cell has a cage clue (affects positioning)
- * @param cellWidth Actual cell width for proportional sizing
- * @param verticalOffset Proportional offset when clue is present
  */
 @Composable
-private fun BoxWithConstraintsScope.SmartHintsGrid(
+private fun BoxScope.SmartHintsGrid(
     probs: List<Float>,
     textSize: androidx.compose.ui.unit.TextUnit,
-    hasClue: Boolean = false,
-    cellWidth: Dp = 0.dp,
-    verticalOffset: Dp = 0.dp
+    cellWidth: Dp = 0.dp
 ) {
     val colors = LocalGameColors.current
     val count = probs.size
     val gridDim = ceil(sqrt(count.toFloat())).toInt().coerceAtLeast(1)
-
-    // Smaller text for hints to fit better
     val hintSize = (textSize.value * 0.85f).sp
+    val hintBoxSize = if (cellWidth > 0.dp) (cellWidth / gridDim) * 0.9f else 8.dp
 
-    // Calculate proportional box size based on cell width
-    val hintBoxSize = if (cellWidth > 0.dp) {
-        (cellWidth / gridDim) * 0.9f  // 90% to leave small gaps
-    } else {
-        8.dp  // Fallback
-    }
-
-    // Center position - use proportional offset when clue present
     Column(
-        modifier = Modifier
-            .align(Alignment.Center)
-            .padding(top = if (hasClue) verticalOffset else 0.dp),
+        modifier = Modifier.align(Alignment.Center),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -1261,14 +1215,11 @@ private fun BoxWithConstraintsScope.SmartHintsGrid(
                     val num = row * gridDim + col + 1
                     if (num <= count) {
                         val p = probs[num - 1]
-                        // Fixed-size box for consistent grid alignment
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier.size(hintBoxSize)
                         ) {
                             if (p > 0.1f) {
-                                // Use both opacity AND font weight for probability
-                                // This provides non-color indication of confidence
                                 Text(
                                     text = num.toString(),
                                     fontSize = hintSize,
@@ -1287,50 +1238,28 @@ private fun BoxWithConstraintsScope.SmartHintsGrid(
 
 /**
  * User notes grid - displays pencil marks in a positional grid
- * For 1-9: 3x3 grid, for 10-16: 4x4 grid
- * Grid positions:
- *   1 2 3
- *   4 5 6
- *   7 8 9
- * Centered in the cell - only shown when no value is entered
- *
- * @param notes Boolean list indicating which notes are set
- * @param textSize Base text size (used for scaling)
- * @param puzzleSize Grid size (determines number of digits)
- * @param hasClue Whether this cell has a cage clue (affects positioning)
- * @param cellWidth Actual cell width for proportional box sizing
- * @param verticalOffset Proportional offset when clue is present
- * @param noteBoxSizeRatio Ratio of cell width for each note box
  */
 @Composable
-private fun BoxWithConstraintsScope.AccessibleNoteGrid(
+private fun BoxScope.AccessibleNoteGrid(
     notes: List<Boolean>,
     @Suppress("UNUSED_PARAMETER") textSize: androidx.compose.ui.unit.TextUnit,
     puzzleSize: Int,
-    hasClue: Boolean = false,
     cellWidth: Dp = 0.dp,
-    verticalOffset: Dp = 0.dp,
     noteBoxSizeRatio: Float = 0.28f
 ) {
     val colors = LocalGameColors.current
-
-    // Check if any notes are set
     val hasAnyNotes = notes.take(puzzleSize).any { it }
     if (!hasAnyNotes) return
 
-    // Calculate grid dimensions based on puzzle size
-    // For sizes 1-9: 3x3 grid, for 10-16: 4x4 grid
     val gridDim = when {
         puzzleSize <= 9 -> 3
         puzzleSize <= 16 -> 4
         else -> 5
     }
 
-    // Calculate proportional box size based on cell width
     val noteBoxSize = if (cellWidth > 0.dp) {
         cellWidth * noteBoxSizeRatio
     } else {
-        // Fallback to fixed sizes if cellWidth not available
         when {
             puzzleSize <= 6 -> 10.dp
             puzzleSize <= 9 -> 8.dp
@@ -1338,7 +1267,6 @@ private fun BoxWithConstraintsScope.AccessibleNoteGrid(
         }
     }
 
-    // Smaller text for notes - scales with puzzle size
     val noteSize = when {
         puzzleSize <= 4 -> 10.sp
         puzzleSize <= 6 -> 9.sp
@@ -1346,11 +1274,9 @@ private fun BoxWithConstraintsScope.AccessibleNoteGrid(
         else -> 6.sp
     }
 
-    // Display as positional grid - use proportional offset when clue present
     Column(
         modifier = Modifier
             .align(Alignment.Center)
-            .padding(top = if (hasClue) verticalOffset else 0.dp)
             .background(colors.surface.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
             .padding(1.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1362,25 +1288,22 @@ private fun BoxWithConstraintsScope.AccessibleNoteGrid(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 for (col in 0 until gridDim) {
-                    val num = row * gridDim + col + 1  // 1-indexed
-                    val noteIndex = num - 1  // 0-indexed for array
+                    val num = row * gridDim + col + 1
+                    val noteIndex = num - 1
 
-                    // Proportionally-sized box for consistent grid alignment
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier.size(noteBoxSize)
                     ) {
-                        // Only show digit if it's within puzzle range AND note is set
                         if (num <= puzzleSize && noteIndex < notes.size && notes[noteIndex]) {
                             Text(
                                 text = if (num <= 9) num.toString() else ('A' + (num - 10)).toString(),
                                 fontSize = noteSize,
-                                color = colors.noteText,  // Theme-aware note color
+                                color = colors.noteText,
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Center
                             )
                         }
-                        // Empty positions just show nothing (box reserves space)
                     }
                 }
             }

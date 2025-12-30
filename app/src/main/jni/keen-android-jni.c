@@ -32,20 +32,20 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "jni_error_codes.h"
 #include "keen.h"
+#include "keen_hints.h"
 #include "keen_modes.h"
 #include "keen_validate.h"
-#include "keen_hints.h"
-#include "jni_error_codes.h"
 
 /**
  * Create a structured error response string.
  * Format: "ERR:code:message"
  * Caller must free the returned string with sfree().
  */
-static char *jni_make_error(int code, const char *message) {
+static char* jni_make_error(int code, const char* message) {
     size_t len = strlen(JNI_PREFIX_ERR) + 16 + strlen(message) + 1;
-    char *result = snewn(len, char);
+    char* result = snewn(len, char);
     snprintf(result, len, JNI_ERR_FMT, code, message);
     return result;
 }
@@ -55,27 +55,28 @@ static char *jni_make_error(int code, const char *message) {
  * Format: "OK:payload"
  * Caller must free the returned string with sfree().
  */
-static char *jni_make_success(const char *payload) {
+static char* jni_make_success(const char* payload) {
     size_t len = strlen(JNI_PREFIX_OK) + strlen(payload) + 1;
-    char *result = snewn(len, char);
+    char* result = snewn(len, char);
     strcpy(result, JNI_PREFIX_OK);
     strcat(result, payload);
     return result;
 }
 
 JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFromC(
-    JNIEnv *env, jobject instance, jint size, jint diff, jint multOnly, jlong seed, jint modeFlags) {
-
+    JNIEnv* env, jobject __attribute__((unused)) instance, jint size, jint diff, jint multOnly,
+    jlong seed, jint modeFlags) {
+    (void)instance;
     /* Validate parameters */
     if (size < 3 || size > 16) {
-        char *err = jni_make_error(JNI_ERR_INVALID_PARAMS, "Size must be 3-16");
+        char* err = jni_make_error(JNI_ERR_INVALID_PARAMS, "Size must be 3-16");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
     }
 
     if (diff < 0 || diff > 6) {
-        char *err = jni_make_error(JNI_ERR_INVALID_PARAMS, "Difficulty must be 0-6");
+        char* err = jni_make_error(JNI_ERR_INVALID_PARAMS, "Difficulty must be 0-6");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
@@ -83,8 +84,9 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
 
     /* Validate mode flags for compatibility */
     if (!validate_mode_flags(modeFlags)) {
-        char *err = jni_make_error(JNI_ERR_INVALID_MODES,
-            "Incompatible modes: Zero-inclusive cannot combine with Negative");
+        char* err =
+            jni_make_error(JNI_ERR_INVALID_MODES,
+                           "Incompatible modes: Zero-inclusive cannot combine with Negative");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
@@ -96,12 +98,11 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
      * - For stability, limit these modes to 9x9 max
      * - Standard mode can attempt up to 16x16 (but may timeout)
      */
-    if (size > 9 && (HAS_MODE(modeFlags, MODE_ZERO_INCLUSIVE) ||
-                     HAS_MODE(modeFlags, MODE_NEGATIVE) ||
-                     HAS_MODE(modeFlags, MODE_MODULAR) ||
-                     HAS_MODE(modeFlags, MODE_EXPONENT))) {
-        char *err = jni_make_error(JNI_ERR_SIZE_LIMIT,
-            "Extended modes (Zero/Negative/Modular/Powers) limited to 9x9");
+    if (size > 9 &&
+        (HAS_MODE(modeFlags, MODE_ZERO_INCLUSIVE) || HAS_MODE(modeFlags, MODE_NEGATIVE) ||
+         HAS_MODE(modeFlags, MODE_MODULAR) || HAS_MODE(modeFlags, MODE_EXPONENT))) {
+        char* err = jni_make_error(JNI_ERR_SIZE_LIMIT,
+                                   "Extended modes (Zero/Negative/Modular/Powers) limited to 9x9");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
@@ -117,28 +118,28 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     /* The seed is used as a set of bytes, so passing the content
      * of the memory occupied by the jlong we have. */
     long lseed = seed;
-    struct random_state *rs = random_new((char *)&lseed, sizeof(long));
+    struct random_state* rs = random_new((char*)&lseed, sizeof(long));
 
-    char *aux = NULL;
+    char* aux = NULL;
     int interactive = 0;
 
-    char *level = new_game_desc(&params, rs, &aux, interactive);
+    char* level = new_game_desc(&params, rs, &aux, interactive);
 
     if (level == NULL) {
         random_free(rs);
-        char *err = jni_make_error(JNI_ERR_GENERATION_FAIL, "Native generation returned null");
+        char* err = jni_make_error(JNI_ERR_GENERATION_FAIL, "Native generation returned null");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
     }
 
     /* Combine level and aux into payload */
-    char *combined = snewn((strlen(level) + strlen(aux) + 2), char);
+    char* combined = snewn((strlen(level) + strlen(aux) + 2), char);
     if (combined == NULL) {
         random_free(rs);
         sfree(level);
         sfree(aux);
-        char *err = jni_make_error(JNI_ERR_MEMORY, "Failed to allocate combined buffer");
+        char* err = jni_make_error(JNI_ERR_MEMORY, "Failed to allocate combined buffer");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
@@ -149,7 +150,7 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     strcat(combined, aux);
 
     /* Wrap in success envelope */
-    char *result = jni_make_success(combined);
+    char* result = jni_make_success(combined);
     jstring retval = (*env)->NewStringUTF(env, result);
 
     random_free(rs);
@@ -162,12 +163,12 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
 }
 
 JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFromAI(
-    JNIEnv *env, jobject instance, jint size, jint diff, jint multOnly, jlong seed,
+    JNIEnv* env, jobject instance, jint size, jint diff, jint multOnly, jlong seed,
     jintArray gridFlat, jint modeFlags) {
-
+    (void)instance;
     /* Validate parameters */
     if (size < 3 || size > 16) {
-        char *err = jni_make_error(JNI_ERR_INVALID_PARAMS, "Size must be 3-16");
+        char* err = jni_make_error(JNI_ERR_INVALID_PARAMS, "Size must be 3-16");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
@@ -175,20 +176,20 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
 
     /* Validate mode flags for compatibility */
     if (!validate_mode_flags(modeFlags)) {
-        char *err = jni_make_error(JNI_ERR_INVALID_MODES,
-            "Incompatible modes: Zero-inclusive cannot combine with Negative");
+        char* err =
+            jni_make_error(JNI_ERR_INVALID_MODES,
+                           "Incompatible modes: Zero-inclusive cannot combine with Negative");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
     }
 
     /* Size limits for extended modes */
-    if (size > 9 && (HAS_MODE(modeFlags, MODE_ZERO_INCLUSIVE) ||
-                     HAS_MODE(modeFlags, MODE_NEGATIVE) ||
-                     HAS_MODE(modeFlags, MODE_MODULAR) ||
-                     HAS_MODE(modeFlags, MODE_EXPONENT))) {
-        char *err = jni_make_error(JNI_ERR_SIZE_LIMIT,
-            "Extended modes (Zero/Negative/Modular/Powers) limited to 9x9");
+    if (size > 9 &&
+        (HAS_MODE(modeFlags, MODE_ZERO_INCLUSIVE) || HAS_MODE(modeFlags, MODE_NEGATIVE) ||
+         HAS_MODE(modeFlags, MODE_MODULAR) || HAS_MODE(modeFlags, MODE_EXPONENT))) {
+        char* err = jni_make_error(JNI_ERR_SIZE_LIMIT,
+                                   "Extended modes (Zero/Negative/Modular/Powers) limited to 9x9");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
@@ -201,32 +202,32 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     params.mode_flags = modeFlags;
 
     long lseed = seed;
-    struct random_state *rs = random_new((char *)&lseed, sizeof(long));
+    struct random_state* rs = random_new((char*)&lseed, sizeof(long));
 
     /* Convert Java int array to C digit array */
     jsize len = (*env)->GetArrayLength(env, gridFlat);
     if (len != size * size) {
         random_free(rs);
-        char *err = jni_make_error(JNI_ERR_GRID_SIZE, "Grid array length does not match size*size");
+        char* err = jni_make_error(JNI_ERR_GRID_SIZE, "Grid array length does not match size*size");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
     }
 
-    jint *body = (*env)->GetIntArrayElements(env, gridFlat, 0);
+    jint* body = (*env)->GetIntArrayElements(env, gridFlat, 0);
     if (body == NULL) {
         random_free(rs);
-        char *err = jni_make_error(JNI_ERR_MEMORY, "Failed to access grid array");
+        char* err = jni_make_error(JNI_ERR_MEMORY, "Failed to access grid array");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
     }
 
-    digit *input_grid = snewn(len, digit);
+    digit* input_grid = snewn((size_t)len, digit);
     if (input_grid == NULL) {
         (*env)->ReleaseIntArrayElements(env, gridFlat, body, 0);
         random_free(rs);
-        char *err = jni_make_error(JNI_ERR_MEMORY, "Failed to allocate input grid");
+        char* err = jni_make_error(JNI_ERR_MEMORY, "Failed to allocate input grid");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
@@ -237,29 +238,30 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     }
     (*env)->ReleaseIntArrayElements(env, gridFlat, body, 0);
 
-    char *aux = NULL;
+    char* aux = NULL;
     int interactive = 0;
 
     /* Try to generate a game description from the provided grid */
-    char *level = new_game_desc_from_grid(&params, rs, input_grid, &aux, interactive);
+    char* level = new_game_desc_from_grid(&params, rs, input_grid, &aux, interactive);
 
     if (level == NULL) {
         sfree(input_grid);
         random_free(rs);
-        char *err = jni_make_error(JNI_ERR_INVALID_GRID, "AI grid rejected - not valid for requested difficulty");
+        char* err = jni_make_error(JNI_ERR_INVALID_GRID,
+                                   "AI grid rejected - not valid for requested difficulty");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
     }
 
     /* Combine level and aux into payload */
-    char *combined = snewn((strlen(level) + strlen(aux) + 2), char);
+    char* combined = snewn((strlen(level) + strlen(aux) + 2), char);
     if (combined == NULL) {
         sfree(input_grid);
         random_free(rs);
         sfree(level);
         sfree(aux);
-        char *err = jni_make_error(JNI_ERR_MEMORY, "Failed to allocate combined buffer");
+        char* err = jni_make_error(JNI_ERR_MEMORY, "Failed to allocate combined buffer");
         jstring retval = (*env)->NewStringUTF(env, err);
         sfree(err);
         return retval;
@@ -270,7 +272,7 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     strcat(combined, aux);
 
     /* Wrap in success envelope */
-    char *result = jni_make_success(combined);
+    char* result = jni_make_success(combined);
     jstring retval = (*env)->NewStringUTF(env, result);
 
     random_free(rs);
@@ -283,20 +285,23 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     return retval;
 }
 
-void fatal(char *fmt, ...) {
+void fatal(char* fmt, ...) {
     va_list ap;
 
     fprintf(stderr, "fatal error: ");
 
     va_start(ap, fmt);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
     vfprintf(stderr, fmt, ap);
+#pragma clang diagnostic pop
     va_end(ap);
 
     fprintf(stderr, "\n");
     exit(1);
 }
 
-static void memswap(void *av, void *bv, int size) {
+static void memswap(void* av, void* bv, int size) {
     char tmpbuf[512];
     char *a = av, *b = bv;
 
@@ -311,14 +316,14 @@ static void memswap(void *av, void *bv, int size) {
     }
 }
 
-void shuffle(void *array, int nelts, int eltsize, random_state *rs) {
-    char *carray = (char *)array;
+void shuffle(void* array, int nelts, int eltsize, random_state* rs) {
+    char* carray = (char*)array;
     unsigned long i;
 
     for (i = (unsigned long)nelts; i-- > 1;) {
         unsigned long j = random_upto(rs, i + 1);
         if (j != i)
-            memswap(carray + eltsize * i, carray + eltsize * j, eltsize);
+            memswap(carray + (size_t)eltsize * i, carray + (size_t)eltsize * j, (int)eltsize);
     }
 }
 
@@ -339,17 +344,16 @@ void shuffle(void *array, int nelts, int eltsize, random_state *rs) {
  * @return IntArray of error flags (VALID_ERR_ROW | VALID_ERR_COL | VALID_ERR_CAGE)
  */
 JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenValidator_validateGrid(
-    JNIEnv *env, jclass clazz, jint size, jintArray gridFlat,
-    jintArray dsfFlat, jlongArray cluesFlat, jint modeFlags) {
-
-    (void)clazz;  /* Unused static method receiver */
+    JNIEnv* env, jclass clazz, jint size, jintArray gridFlat, jintArray dsfFlat,
+    jlongArray cluesFlat, jint modeFlags) {
+    (void)clazz; /* Unused static method receiver */
 
     int n = size * size;
 
     /* Get array elements */
-    jint *grid_body = (*env)->GetIntArrayElements(env, gridFlat, 0);
-    jint *dsf_body = (*env)->GetIntArrayElements(env, dsfFlat, 0);
-    jlong *clues_body = (*env)->GetLongArrayElements(env, cluesFlat, 0);
+    jint* grid_body = (*env)->GetIntArrayElements(env, gridFlat, 0);
+    jint* dsf_body = (*env)->GetIntArrayElements(env, dsfFlat, 0);
+    jlong* clues_body = (*env)->GetLongArrayElements(env, cluesFlat, 0);
 
     if (!grid_body || !dsf_body || !clues_body) {
         if (grid_body) (*env)->ReleaseIntArrayElements(env, gridFlat, grid_body, 0);
@@ -359,10 +363,10 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenValidator_validateGri
     }
 
     /* Convert to native types */
-    digit *grid = snewn(n, digit);
-    int *dsf = snewn(n, int);
-    long *clues = snewn(n, long);
-    int *errors = snewn(n, int);
+    digit* grid = snewn((size_t)n, digit);
+    int* dsf = snewn((size_t)n, int);
+    long* clues = snewn((size_t)n, long);
+    int* errors = snewn((size_t)n, int);
 
     for (int i = 0; i < n; i++) {
         grid[i] = (digit)grid_body[i];
@@ -407,16 +411,15 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenValidator_validateGri
  * @return 1 if complete and valid, 0 otherwise
  */
 JNIEXPORT jint JNICALL Java_org_yegie_keenkenning_KeenValidator_isComplete(
-    JNIEnv *env, jclass clazz, jint size, jintArray gridFlat,
-    jintArray dsfFlat, jlongArray cluesFlat, jint modeFlags) {
-
+    JNIEnv* env, jclass clazz, jint size, jintArray gridFlat, jintArray dsfFlat,
+    jlongArray cluesFlat, jint modeFlags) {
     (void)clazz;
 
     int n = size * size;
 
-    jint *grid_body = (*env)->GetIntArrayElements(env, gridFlat, 0);
-    jint *dsf_body = (*env)->GetIntArrayElements(env, dsfFlat, 0);
-    jlong *clues_body = (*env)->GetLongArrayElements(env, cluesFlat, 0);
+    jint* grid_body = (*env)->GetIntArrayElements(env, gridFlat, 0);
+    jint* dsf_body = (*env)->GetIntArrayElements(env, dsfFlat, 0);
+    jlong* clues_body = (*env)->GetLongArrayElements(env, cluesFlat, 0);
 
     if (!grid_body || !dsf_body || !clues_body) {
         if (grid_body) (*env)->ReleaseIntArrayElements(env, gridFlat, grid_body, 0);
@@ -425,9 +428,9 @@ JNIEXPORT jint JNICALL Java_org_yegie_keenkenning_KeenValidator_isComplete(
         return 0;
     }
 
-    digit *grid = snewn(n, digit);
-    int *dsf = snewn(n, int);
-    long *clues = snewn(n, long);
+    digit* grid = snewn((size_t)n, digit);
+    int* dsf = snewn((size_t)n, int);
+    long* clues = snewn((size_t)n, long);
 
     for (int i = 0; i < n; i++) {
         grid[i] = (digit)grid_body[i];
@@ -474,18 +477,16 @@ JNIEXPORT jint JNICALL Java_org_yegie_keenkenning_KeenValidator_isComplete(
  *         Returns null if no hint available
  */
 JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_getNextHint(
-    JNIEnv *env, jclass clazz, jint size, jintArray gridFlat,
-    jintArray dsfFlat, jlongArray cluesFlat, jintArray solutionFlat, jint modeFlags) {
-
+    JNIEnv* env, jclass clazz, jint size, jintArray gridFlat, jintArray dsfFlat,
+    jlongArray cluesFlat, jintArray solutionFlat, jint modeFlags) {
     (void)clazz;
 
     int n = size * size;
 
-    jint *grid_body = (*env)->GetIntArrayElements(env, gridFlat, 0);
-    jint *dsf_body = (*env)->GetIntArrayElements(env, dsfFlat, 0);
-    jlong *clues_body = (*env)->GetLongArrayElements(env, cluesFlat, 0);
-    jint *solution_body = solutionFlat ?
-        (*env)->GetIntArrayElements(env, solutionFlat, 0) : NULL;
+    jint* grid_body = (*env)->GetIntArrayElements(env, gridFlat, 0);
+    jint* dsf_body = (*env)->GetIntArrayElements(env, dsfFlat, 0);
+    jlong* clues_body = (*env)->GetLongArrayElements(env, cluesFlat, 0);
+    jint* solution_body = solutionFlat ? (*env)->GetIntArrayElements(env, solutionFlat, 0) : NULL;
 
     if (!grid_body || !dsf_body || !clues_body) {
         if (grid_body) (*env)->ReleaseIntArrayElements(env, gridFlat, grid_body, 0);
@@ -495,10 +496,10 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_getNextHint(
         return NULL;
     }
 
-    digit *grid = snewn(n, digit);
-    int *dsf = snewn(n, int);
-    long *clues = snewn(n, long);
-    digit *solution = solutionFlat ? snewn(n, digit) : NULL;
+    digit* grid = snewn((size_t)n, digit);
+    int* dsf = snewn((size_t)n, int);
+    long* clues = snewn((size_t)n, long);
+    digit* solution = solutionFlat ? snewn((size_t)n, digit) : NULL;
 
     for (int i = 0; i < n; i++) {
         grid[i] = (digit)grid_body[i];
@@ -526,15 +527,8 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_getNextHint(
     if (kenken_get_hint(&ctx, &result)) {
         ret = (*env)->NewIntArray(env, 7);
         if (ret) {
-            jint data[7] = {
-                result.hint_type,
-                result.cell,
-                result.row,
-                result.col,
-                result.value,
-                result.cage_root,
-                result.related_pos
-            };
+            jint data[7] = {result.hint_type, result.cell,      result.row,        result.col,
+                            result.value,     result.cage_root, result.related_pos};
             (*env)->SetIntArrayRegion(env, ret, 0, 7, data);
         }
     }
@@ -551,18 +545,16 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_getNextHint(
  * Explain why a specific cell has a particular value.
  */
 JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_explainCell(
-    JNIEnv *env, jclass clazz, jint size, jint cell, jintArray gridFlat,
-    jintArray dsfFlat, jlongArray cluesFlat, jintArray solutionFlat, jint modeFlags) {
-
+    JNIEnv* env, jclass clazz, jint size, jint cell, jintArray gridFlat, jintArray dsfFlat,
+    jlongArray cluesFlat, jintArray solutionFlat, jint modeFlags) {
     (void)clazz;
 
     int n = size * size;
 
-    jint *grid_body = (*env)->GetIntArrayElements(env, gridFlat, 0);
-    jint *dsf_body = (*env)->GetIntArrayElements(env, dsfFlat, 0);
-    jlong *clues_body = (*env)->GetLongArrayElements(env, cluesFlat, 0);
-    jint *solution_body = solutionFlat ?
-        (*env)->GetIntArrayElements(env, solutionFlat, 0) : NULL;
+    jint* grid_body = (*env)->GetIntArrayElements(env, gridFlat, 0);
+    jint* dsf_body = (*env)->GetIntArrayElements(env, dsfFlat, 0);
+    jlong* clues_body = (*env)->GetLongArrayElements(env, cluesFlat, 0);
+    jint* solution_body = solutionFlat ? (*env)->GetIntArrayElements(env, solutionFlat, 0) : NULL;
 
     if (!grid_body || !dsf_body || !clues_body) {
         if (grid_body) (*env)->ReleaseIntArrayElements(env, gridFlat, grid_body, 0);
@@ -572,10 +564,10 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_explainCell(
         return NULL;
     }
 
-    digit *grid = snewn(n, digit);
-    int *dsf = snewn(n, int);
-    long *clues = snewn(n, long);
-    digit *solution = solutionFlat ? snewn(n, digit) : NULL;
+    digit* grid = snewn((size_t)n, digit);
+    int* dsf = snewn((size_t)n, int);
+    long* clues = snewn((size_t)n, long);
+    digit* solution = solutionFlat ? snewn((size_t)n, digit) : NULL;
 
     for (int i = 0; i < n; i++) {
         grid[i] = (digit)grid_body[i];
@@ -603,15 +595,8 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_explainCell(
     if (kenken_explain_cell(&ctx, cell, &result)) {
         ret = (*env)->NewIntArray(env, 7);
         if (ret) {
-            jint data[7] = {
-                result.hint_type,
-                result.cell,
-                result.row,
-                result.col,
-                result.value,
-                result.cage_root,
-                result.related_pos
-            };
+            jint data[7] = {result.hint_type, result.cell,      result.row,        result.col,
+                            result.value,     result.cage_root, result.related_pos};
             (*env)->SetIntArrayRegion(env, ret, 0, 7, data);
         }
     }

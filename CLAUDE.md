@@ -11,36 +11,31 @@ Android Keen puzzle game (KenKen-style) with two product flavors:
 Package: `org.yegie.keenkenning` (with `.classik` or `.kenning` suffix per flavor)
 
 ## Build Commands
+- **Build Debug:** `./gradlew assembleKenningDebug`
+- **Build Release:** `./gradlew assembleKenningRelease`
+- **Clean Build:** `./gradlew clean assembleKenningDebug`
+- **Run Unit Tests:** `./gradlew testKenningDebugUnitTest`
+- **Run InstrumentedTests:** `./gradlew connectedKenningDebugAndroidTest`
+- **Lint:** `./gradlew lintKenningDebug`
+- **Format Kotlin:** `./gradlew ktlintFormat`
+- **Format C/C++:** `find app/src/main/jni -name "*.[ch]" -exec clang-format -i {} +`
 
-```bash
-# Debug build (JDK 21 required)
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew assembleDebug
-
-# Lint check (warnings as errors enforced)
-./gradlew lintDebug
-
-# Unit tests
-./gradlew testDebugUnitTest
-
-# Single test class
-./gradlew testDebugUnitTest --tests "org.yegie.keenkenning.data.PuzzleParserTest"
-
-# Instrumented tests (device required)
-./gradlew connectedAndroidTest
-
-# Clean build
-./gradlew clean assembleDebug
-```
-
-Or use Makefile shortcuts:
-```bash
-make build          # Debug APK
-make test           # Unit tests
-make lint           # Lint check
-make install        # Install to device
-make run-kenning    # Install and launch Kenning flavor
-make run-classik    # Install and launch Classik flavor
-```
+## Code Style
+- **Kotlin:** Follows strict Kotlin coding conventions (ktlint enforced).
+  - Use `val` over `var` where possible.
+  - Data classes for models.
+  - Sealed classes for state.
+  - `allWarningsAsErrors = true` is enabled.
+- **C/C++:**
+  - **Standard:** ISO/IEC 9899:2023 (C23) and ISO/IEC 14882:2023 (C++23).
+  - **Compliance:** Strict "Warnings as Errors" (`-Werror -Wall -Wextra`).
+  - **Formatting:** Google Style (Clang-Format).
+  - **Conventions:**
+    - Use `bool`, `true`, `false` (stdbool.h not required in C23).
+    - Use `nullptr` instead of `NULL`.
+    - Explicit casts for all arithmetic conversions (`size_t`, `int`, `char`).
+    - Mark unused functions/params with `[[maybe_unused]]`.
+    - No GNU extensions (`CMAKE_C_EXTENSIONS OFF`).
 
 ## Architecture
 

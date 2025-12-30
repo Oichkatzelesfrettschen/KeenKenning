@@ -88,8 +88,8 @@
  *  - the returned value from the function is the total flow
  *    achieved.
  */
-int maxflow_with_scratch(void *scratch, int nv, int source, int sink, int ne, const int *edges,
-                         const int *backedges, const int *capacity, int *flow, int *cut);
+int maxflow_with_scratch(void* scratch, int nv, int source, int sink, int ne, const int* edges,
+                         const int* backedges, const int* capacity, int* flow, int* cut);
 
 /*
  * The above function expects its `scratch' and `backedges'
@@ -99,7 +99,7 @@ int maxflow_with_scratch(void *scratch, int nv, int source, int sink, int ne, co
  * up.
  */
 int maxflow_scratch_size(int nv);
-void maxflow_setup_backedges(int ne, const int *edges, int *backedges);
+void maxflow_setup_backedges(int ne, const int* edges, int* backedges);
 
 /*
  * Simplified version of the above function. All parameters are the
@@ -113,7 +113,7 @@ void maxflow_setup_backedges(int ne, const int *edges, int *backedges);
  * Additional return value is now -1, meaning that scratch space
  * could not be allocated.
  */
-int maxflow(int nv, int source, int sink, int ne, const int *edges, const int *capacity, int *flow,
-            int *cut);
+int maxflow(int nv, int source, int sink, int ne, const int* edges, const int* capacity, int* flow,
+            int* cut);
 
 #endif /* MAXFLOW_MAXFLOW_H */

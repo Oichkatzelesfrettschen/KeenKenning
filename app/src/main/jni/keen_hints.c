@@ -9,22 +9,24 @@
  */
 
 #include "keen_hints.h"
-#include "keen_modes.h"
-#include "puzzles.h"
+
 #include <string.h>
 
+#include "keen_modes.h"
+#include "puzzles.h"
+
 /* Forward declaration */
-extern int dsf_canonify(int *dsf, int index);
+extern int dsf_canonify(int* dsf, int index);
 
 /*
  * Calculate candidates for a cell based on row/column constraints.
  * Returns a bitmask where bit i is set if value i is possible.
  */
-static int get_candidates(const hint_ctx *ctx, int cell) {
+static int get_candidates(const hint_ctx* ctx, int cell) {
     int w = ctx->w;
     int row = cell / w;
     int col = cell % w;
-    int candidates = (1 << (w + 1)) - 2;  /* Bits 1..w set */
+    int candidates = (1 << (w + 1)) - 2; /* Bits 1..w set */
 
     /* Eliminate values already in row */
     for (int c = 0; c < w; c++) {
@@ -62,8 +64,7 @@ static int popcount(int x) {
  * Returns 0 if not exactly one bit is set.
  */
 static int single_bit_pos(int x) {
-    if (x == 0 || (x & (x - 1)) != 0)
-        return 0;  /* Not exactly one bit */
+    if (x == 0 || (x & (x - 1)) != 0) return 0; /* Not exactly one bit */
     int pos = 1;
     while ((x & (1 << pos)) == 0) pos++;
     return pos;
@@ -72,12 +73,12 @@ static int single_bit_pos(int x) {
 /*
  * Check for naked single: only one candidate for a cell.
  */
-static int find_naked_single(const hint_ctx *ctx, hint_result *result) {
+static int find_naked_single(const hint_ctx* ctx, hint_result* result) {
     int w = ctx->w;
     int n = w * w;
 
     for (int cell = 0; cell < n; cell++) {
-        if (ctx->grid[cell] != 0) continue;  /* Already filled */
+        if (ctx->grid[cell] != 0) continue; /* Already filled */
 
         int candidates = get_candidates(ctx, cell);
         if (popcount(candidates) == 1) {
@@ -100,7 +101,7 @@ static int find_naked_single(const hint_ctx *ctx, hint_result *result) {
 /*
  * Check for hidden single: value can only go in one cell in a row.
  */
-static int find_hidden_single_row(const hint_ctx *ctx, hint_result *result) {
+static int find_hidden_single_row(const hint_ctx* ctx, hint_result* result) {
     int w = ctx->w;
 
     for (int row = 0; row < w; row++) {
@@ -137,7 +138,7 @@ static int find_hidden_single_row(const hint_ctx *ctx, hint_result *result) {
                 result->col = possible_cell % w;
                 result->value = val;
                 result->cage_root = dsf_canonify(ctx->dsf, possible_cell);
-                result->related_pos = row;  /* The row that forces this */
+                result->related_pos = row; /* The row that forces this */
                 return 1;
             }
         }
@@ -148,7 +149,7 @@ static int find_hidden_single_row(const hint_ctx *ctx, hint_result *result) {
 /*
  * Check for hidden single in column.
  */
-static int find_hidden_single_col(const hint_ctx *ctx, hint_result *result) {
+static int find_hidden_single_col(const hint_ctx* ctx, hint_result* result) {
     int w = ctx->w;
 
     for (int col = 0; col < w; col++) {
@@ -184,7 +185,7 @@ static int find_hidden_single_col(const hint_ctx *ctx, hint_result *result) {
                 result->col = col;
                 result->value = val;
                 result->cage_root = dsf_canonify(ctx->dsf, possible_cell);
-                result->related_pos = col + 100;  /* +100 to indicate column */
+                result->related_pos = col + 100; /* +100 to indicate column */
                 return 1;
             }
         }
@@ -195,7 +196,7 @@ static int find_hidden_single_col(const hint_ctx *ctx, hint_result *result) {
 /*
  * Check for single-cell cage (the clue IS the answer).
  */
-static int find_cage_single(const hint_ctx *ctx, hint_result *result) {
+static int find_cage_single(const hint_ctx* ctx, hint_result* result) {
     int w = ctx->w;
     int n = w * w;
 
@@ -213,7 +214,7 @@ static int find_cage_single(const hint_ctx *ctx, hint_result *result) {
         if (cage_size == 1) {
             /* Single-cell cage - clue value IS the answer */
             long clue = ctx->clues[root];
-            int value = (int)(clue & 0x1FFFFFFFL);  /* Strip operation bits */
+            int value = (int)(clue & 0x1FFFFFFFL); /* Strip operation bits */
 
             if (value >= 1 && value <= w) {
                 result->hint_type = HINT_CAGE_SINGLE;
@@ -233,24 +234,20 @@ static int find_cage_single(const hint_ctx *ctx, hint_result *result) {
 /*
  * Find next hint using progressive difficulty.
  */
-int kenken_get_hint(const hint_ctx *ctx, hint_result *result) {
+int kenken_get_hint(const hint_ctx* ctx, hint_result* result) {
     memset(result, 0, sizeof(hint_result));
 
     /* Priority 1: Single-cell cages (trivial) */
-    if (find_cage_single(ctx, result))
-        return 1;
+    if (find_cage_single(ctx, result)) return 1;
 
     /* Priority 2: Naked singles (only one candidate) */
-    if (find_naked_single(ctx, result))
-        return 1;
+    if (find_naked_single(ctx, result)) return 1;
 
     /* Priority 3: Hidden singles in rows */
-    if (find_hidden_single_row(ctx, result))
-        return 1;
+    if (find_hidden_single_row(ctx, result)) return 1;
 
     /* Priority 4: Hidden singles in columns */
-    if (find_hidden_single_col(ctx, result))
-        return 1;
+    if (find_hidden_single_col(ctx, result)) return 1;
 
     /* No simple hint available - puzzle may need guessing */
     result->hint_type = HINT_NONE;
@@ -260,14 +257,12 @@ int kenken_get_hint(const hint_ctx *ctx, hint_result *result) {
 /*
  * Explain a specific cell.
  */
-int kenken_explain_cell(const hint_ctx *ctx, int cell, hint_result *result) {
+int kenken_explain_cell(const hint_ctx* ctx, int cell, hint_result* result) {
     int w = ctx->w;
 
-    if (cell < 0 || cell >= w * w)
-        return 0;
+    if (cell < 0 || cell >= w * w) return 0;
 
-    if (ctx->grid[cell] != 0)
-        return 0;  /* Already filled */
+    if (ctx->grid[cell] != 0) return 0; /* Already filled */
 
     memset(result, 0, sizeof(hint_result));
 
@@ -310,7 +305,7 @@ int kenken_explain_cell(const hint_ctx *ctx, int cell, hint_result *result) {
 
         /* Verify this value is still a candidate */
         if (candidates & (1 << val)) {
-            result->hint_type = HINT_CAGE_FORCE;  /* Generic "trust me" */
+            result->hint_type = HINT_CAGE_FORCE; /* Generic "trust me" */
             result->cell = cell;
             result->row = cell / w;
             result->col = cell % w;

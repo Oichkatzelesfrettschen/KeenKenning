@@ -1,0 +1,18 @@
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  google-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -google-readability-todo,
+  -readability-magic-numbers,
+  -cert-dcl37-c,
+  -cert-dcl51-cpp
+
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*'
+FormatStyle: file

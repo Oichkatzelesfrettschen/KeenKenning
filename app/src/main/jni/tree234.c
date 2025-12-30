@@ -33,11 +33,11 @@
  * SOFTWARE.
  */
 
+#include "tree234.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tree234.h"
 
 #include "puzzles.h" /* for smalloc/sfree */
 
@@ -53,24 +53,24 @@
 typedef struct node234_Tag node234;
 
 struct tree234_Tag {
-    node234 *root;
+    node234* root;
     cmpfn234 cmp;
 };
 
 struct node234_Tag {
-    node234 *parent;
-    node234 *kids[4];
+    node234* parent;
+    node234* kids[4];
     int counts[4];
-    void *elems[3];
+    void* elems[3];
 };
 
 /*
  * Create a 2-3-4 tree.
  */
-tree234 *newtree234(cmpfn234 cmp) {
-    tree234 *ret = snew(tree234);
+tree234* newtree234(cmpfn234 cmp) {
+    tree234* ret = snew(tree234);
     LOG(("created tree %p\n", ret));
-    ret->root = NULL;
+    ret->root = nullptr;
     ret->cmp = cmp;
     return ret;
 }
@@ -78,16 +78,15 @@ tree234 *newtree234(cmpfn234 cmp) {
 /*
  * Free a 2-3-4 tree (not including freeing the elements).
  */
-static void freenode234(node234 *n) {
-    if (!n)
-        return;
+static void freenode234(node234* n) {
+    if (!n) return;
     freenode234(n->kids[0]);
     freenode234(n->kids[1]);
     freenode234(n->kids[2]);
     freenode234(n->kids[3]);
     sfree(n);
 }
-void freetree234(tree234 *t) {
+void freetree234(tree234* t) {
     freenode234(t->root);
     sfree(t);
 }
@@ -95,23 +94,20 @@ void freetree234(tree234 *t) {
 /*
  * Internal function to count a node.
  */
-static int countnode234(node234 *n) {
+static int countnode234(node234* n) {
     int count = 0;
     int i;
-    if (!n)
-        return 0;
-    for (i = 0; i < 4; i++)
-        count += n->counts[i];
+    if (!n) return 0;
+    for (i = 0; i < 4; i++) count += n->counts[i];
     for (i = 0; i < 3; i++)
-        if (n->elems[i])
-            count++;
+        if (n->elems[i]) count++;
     return count;
 }
 
 /*
  * Count the elements in a tree.
  */
-int count234(tree234 *t) {
+int count234(tree234* t) {
     if (t->root)
         return countnode234(t->root);
     else
@@ -122,7 +118,7 @@ int count234(tree234 *t) {
  * Propagate a node overflow up a tree until it stops. Returns 0 or
  * 1, depending on whether the root had to be split or not.
  */
-static int add234_insert(node234 *left, void *e, node234 *right, node234 **root, node234 *n,
+static int add234_insert(node234* left, void* e, node234* right, node234** root, node234* n,
                          int ki) {
     int lcount, rcount;
     /*
@@ -137,7 +133,7 @@ static int add234_insert(node234 *left, void *e, node234 *right, node234 **root,
              n->elems[2], n->kids[3], n->counts[3]));
         LOG(("  need to insert %p/%d \"%s\" %p/%d at position %d\n", left, lcount, e, right, rcount,
              ki));
-        if (n->elems[1] == NULL) {
+        if (n->elems[1] == nullptr) {
             /*
              * Insert in a 2-node; simple.
              */
@@ -159,15 +155,12 @@ static int add234_insert(node234 *left, void *e, node234 *right, node234 **root,
                 n->kids[1] = left;
                 n->counts[1] = lcount;
             }
-            if (n->kids[0])
-                n->kids[0]->parent = n;
-            if (n->kids[1])
-                n->kids[1]->parent = n;
-            if (n->kids[2])
-                n->kids[2]->parent = n;
+            if (n->kids[0]) n->kids[0]->parent = n;
+            if (n->kids[1]) n->kids[1]->parent = n;
+            if (n->kids[2]) n->kids[2]->parent = n;
             LOG(("  done\n"));
             break;
-        } else if (n->elems[2] == NULL) {
+        } else if (n->elems[2] == nullptr) {
             /*
              * Insert in a 3-node; simple.
              */
@@ -202,18 +195,14 @@ static int add234_insert(node234 *left, void *e, node234 *right, node234 **root,
                 n->kids[2] = left;
                 n->counts[2] = lcount;
             }
-            if (n->kids[0])
-                n->kids[0]->parent = n;
-            if (n->kids[1])
-                n->kids[1]->parent = n;
-            if (n->kids[2])
-                n->kids[2]->parent = n;
-            if (n->kids[3])
-                n->kids[3]->parent = n;
+            if (n->kids[0]) n->kids[0]->parent = n;
+            if (n->kids[1]) n->kids[1]->parent = n;
+            if (n->kids[2]) n->kids[2]->parent = n;
+            if (n->kids[3]) n->kids[3]->parent = n;
             LOG(("  done\n"));
             break;
         } else {
-            node234 *m = snew(node234);
+            node234* m = snew(node234);
             m->parent = n->parent;
             LOG(("  splitting a 4-node; created new node %p\n", m));
             /*
@@ -284,19 +273,14 @@ static int add234_insert(node234 *left, void *e, node234 *right, node234 **root,
                 n->counts[1] = rcount;
                 e = n->elems[2];
             }
-            m->kids[3] = n->kids[3] = n->kids[2] = NULL;
+            m->kids[3] = n->kids[3] = n->kids[2] = nullptr;
             m->counts[3] = n->counts[3] = n->counts[2] = 0;
-            m->elems[2] = n->elems[2] = n->elems[1] = NULL;
-            if (m->kids[0])
-                m->kids[0]->parent = m;
-            if (m->kids[1])
-                m->kids[1]->parent = m;
-            if (m->kids[2])
-                m->kids[2]->parent = m;
-            if (n->kids[0])
-                n->kids[0]->parent = n;
-            if (n->kids[1])
-                n->kids[1]->parent = n;
+            m->elems[2] = n->elems[2] = n->elems[1] = nullptr;
+            if (m->kids[0]) m->kids[0]->parent = m;
+            if (m->kids[1]) m->kids[1]->parent = m;
+            if (m->kids[2]) m->kids[2]->parent = m;
+            if (n->kids[0]) n->kids[0]->parent = n;
+            if (n->kids[1]) n->kids[1]->parent = n;
             LOG(("  left (%p): %p/%d \"%s\" %p/%d \"%s\" %p/%d\n", m, m->kids[0], m->counts[0],
                  m->elems[0], m->kids[1], m->counts[1], m->elems[1], m->kids[2], m->counts[2]));
             LOG(("  right (%p): %p/%d \"%s\" %p/%d\n", n, n->kids[0], n->counts[0], n->elems[0],
@@ -316,8 +300,8 @@ static int add234_insert(node234 *left, void *e, node234 *right, node234 **root,
 
     /*
      * If we've come out of here by `break', n will still be
-     * non-NULL and all we need to do is go back up the tree
-     * updating counts. If we've come here because n is NULL, we
+     * non-nullptr and all we need to do is go back up the tree
+     * updating counts. If we've come here because n is nullptr, we
      * need to create a new root for the tree because the old one
      * has just split into two. */
     if (n) {
@@ -340,17 +324,15 @@ static int add234_insert(node234 *left, void *e, node234 *right, node234 **root,
         (*root)->elems[0] = e;
         (*root)->kids[1] = right;
         (*root)->counts[1] = rcount;
-        (*root)->elems[1] = NULL;
-        (*root)->kids[2] = NULL;
+        (*root)->elems[1] = nullptr;
+        (*root)->kids[2] = nullptr;
         (*root)->counts[2] = 0;
-        (*root)->elems[2] = NULL;
-        (*root)->kids[3] = NULL;
+        (*root)->elems[2] = nullptr;
+        (*root)->kids[3] = nullptr;
         (*root)->counts[3] = 0;
-        (*root)->parent = NULL;
-        if ((*root)->kids[0])
-            (*root)->kids[0]->parent = (*root);
-        if ((*root)->kids[1])
-            (*root)->kids[1]->parent = (*root);
+        (*root)->parent = nullptr;
+        if ((*root)->kids[0]) (*root)->kids[0]->parent = (*root);
+        if ((*root)->kids[1]) (*root)->kids[1]->parent = (*root);
         LOG(("  new root is %p/%d \"%s\" %p/%d\n", (*root)->kids[0], (*root)->counts[0],
              (*root)->elems[0], (*root)->kids[1], (*root)->counts[1]));
         return 1; /* root moved */
@@ -361,21 +343,21 @@ static int add234_insert(node234 *left, void *e, node234 *right, node234 **root,
  * Add an element e to a 2-3-4 tree t. Returns e on success, or if
  * an existing element compares equal, returns that.
  */
-static void *add234_internal(tree234 *t, void *e, int index) {
-    node234 *n;
+static void* add234_internal(tree234* t, void* e, int index) {
+    node234* n;
     int ki;
-    void *orig_e = e;
+    void* orig_e = e;
     int c;
 
     LOG(("adding element \"%s\" to tree %p\n", e, t));
-    if (t->root == NULL) {
+    if (t->root == nullptr) {
         t->root = snew(node234);
-        t->root->elems[1] = t->root->elems[2] = NULL;
-        t->root->kids[0] = t->root->kids[1] = NULL;
-        t->root->kids[2] = t->root->kids[3] = NULL;
+        t->root->elems[1] = t->root->elems[2] = nullptr;
+        t->root->kids[0] = t->root->kids[1] = nullptr;
+        t->root->kids[2] = t->root->kids[3] = nullptr;
         t->root->counts[0] = t->root->counts[1] = 0;
         t->root->counts[2] = t->root->counts[3] = 0;
-        t->root->parent = NULL;
+        t->root->parent = nullptr;
         t->root->elems[0] = e;
         LOG(("  created root %p\n", t->root));
         return orig_e;
@@ -410,18 +392,18 @@ static void *add234_internal(tree234 *t, void *e, int index) {
                 } else if (index -= n->counts[2] + 1, index <= n->counts[3]) {
                     ki = 3;
                 } else
-                    return NULL; /* error: index out of range */
+                    return nullptr; /* error: index out of range */
             }
         } else {
             if ((c = t->cmp(e, n->elems[0])) < 0)
                 ki = 0;
             else if (c == 0)
                 return n->elems[0]; /* already exists */
-            else if (n->elems[1] == NULL || (c = t->cmp(e, n->elems[1])) < 0)
+            else if (n->elems[1] == nullptr || (c = t->cmp(e, n->elems[1])) < 0)
                 ki = 1;
             else if (c == 0)
                 return n->elems[1]; /* already exists */
-            else if (n->elems[2] == NULL || (c = t->cmp(e, n->elems[2])) < 0)
+            else if (n->elems[2] == nullptr || (c = t->cmp(e, n->elems[2])) < 0)
                 ki = 2;
             else if (c == 0)
                 return n->elems[2]; /* already exists */
@@ -429,42 +411,39 @@ static void *add234_internal(tree234 *t, void *e, int index) {
                 ki = 3;
         }
         LOG(("  moving to child %d (%p)\n", ki, n->kids[ki]));
-        if (!n->kids[ki])
-            break;
+        if (!n->kids[ki]) break;
         n = n->kids[ki];
     }
 
-    add234_insert(NULL, e, NULL, &t->root, n, ki);
+    add234_insert(nullptr, e, nullptr, &t->root, n, ki);
 
     return orig_e;
 }
 
-void *add234(tree234 *t, void *e) {
+void* add234(tree234* t, void* e) {
     if (!t->cmp) /* tree is unsorted */
-        return NULL;
+        return nullptr;
 
     return add234_internal(t, e, -1);
 }
-void *addpos234(tree234 *t, void *e, int index) {
-    if (index < 0 || /* index out of range */
-        t->cmp)      /* tree is sorted */
-        return NULL; /* return failure */
+void* addpos234(tree234* t, void* e, int index) {
+    if (index < 0 ||    /* index out of range */
+        t->cmp)         /* tree is sorted */
+        return nullptr; /* return failure */
 
     return add234_internal(t, e, index); /* this checks the upper bound */
 }
 
 /*
  * Look up the element at a given numeric index in a 2-3-4 tree.
- * Returns NULL if the index is out of range.
+ * Returns nullptr if the index is out of range.
  */
-void *index234(tree234 *t, int index) {
-    node234 *n;
+void* index234(tree234* t, int index) {
+    node234* n;
 
-    if (!t->root)
-        return NULL; /* tree is empty */
+    if (!t->root) return nullptr; /* tree is empty */
 
-    if (index < 0 || index >= countnode234(t->root))
-        return NULL; /* out of range */
+    if (index < 0 || index >= countnode234(t->root)) return nullptr; /* out of range */
 
     n = t->root;
 
@@ -486,27 +465,25 @@ void *index234(tree234 *t, int index) {
     }
 
     /* Unreachable: all valid indices handled above. */
-    return NULL;
+    return nullptr;
 }
 
 /*
- * Find an element e in a sorted 2-3-4 tree t. Returns NULL if not
+ * Find an element e in a sorted 2-3-4 tree t. Returns nullptr if not
  * found. e is always passed as the first argument to cmp, so cmp
  * can be an asymmetric function if desired. cmp can also be passed
- * as NULL, in which case the compare function from the tree proper
+ * as nullptr, in which case the compare function from the tree proper
  * will be used.
  */
-void *findrelpos234(tree234 *t, void *e, cmpfn234 cmp, int relation, int *index) {
-    node234 *n;
-    void *ret;
+void* findrelpos234(tree234* t, void* e, cmpfn234 cmp, int relation, int* index) {
+    node234* n;
+    void* ret;
     int c;
     int idx, ecount, kcount, cmpret;
 
-    if (t->root == NULL)
-        return NULL;
+    if (t->root == nullptr) return nullptr;
 
-    if (cmp == NULL)
-        cmp = t->cmp;
+    if (cmp == nullptr) cmp = t->cmp;
 
     n = t->root;
     /*
@@ -515,10 +492,10 @@ void *findrelpos234(tree234 *t, void *e, cmpfn234 cmp, int relation, int *index)
     idx = 0;
     ecount = -1;
     /*
-     * Prepare a fake `cmp' result if e is NULL.
+     * Prepare a fake `cmp' result if e is nullptr.
      */
     cmpret = 0;
-    if (e == NULL) {
+    if (e == nullptr) {
         assert(relation == REL234_LT || relation == REL234_GT);
         if (relation == REL234_LT)
             cmpret = +1; /* e is a max: always greater */
@@ -527,20 +504,18 @@ void *findrelpos234(tree234 *t, void *e, cmpfn234 cmp, int relation, int *index)
     }
     while (1) {
         for (kcount = 0; kcount < 4; kcount++) {
-            if (kcount >= 3 || n->elems[kcount] == NULL ||
+            if (kcount >= 3 || n->elems[kcount] == nullptr ||
                 (c = cmpret ? cmpret : cmp(e, n->elems[kcount])) < 0) {
                 break;
             }
-            if (n->kids[kcount])
-                idx += n->counts[kcount];
+            if (n->kids[kcount]) idx += n->counts[kcount];
             if (c == 0) {
                 ecount = kcount;
                 break;
             }
             idx++;
         }
-        if (ecount >= 0)
-            break;
+        if (ecount >= 0) break;
         if (n->kids[kcount])
             n = n->kids[kcount];
         else
@@ -554,8 +529,7 @@ void *findrelpos234(tree234 *t, void *e, cmpfn234 cmp, int relation, int *index)
          * relation is EQ, LE or GE we can now go home.
          */
         if (relation != REL234_LT && relation != REL234_GT) {
-            if (index)
-                *index = idx;
+            if (index) *index = idx;
             return n->elems[ecount];
         }
 
@@ -579,8 +553,7 @@ void *findrelpos234(tree234 *t, void *e, cmpfn234 cmp, int relation, int *index)
          * But the actual element isn't there. So if our search
          * relation is EQ, we're doomed.
          */
-        if (relation == REL234_EQ)
-            return NULL;
+        if (relation == REL234_EQ) return nullptr;
 
         /*
          * Otherwise, we must do an index lookup for index idx-1
@@ -594,21 +567,20 @@ void *findrelpos234(tree234 *t, void *e, cmpfn234 cmp, int relation, int *index)
 
     /*
      * We know the index of the element we want; just call index234
-     * to do the rest. This will return NULL if the index is out of
+     * to do the rest. This will return nullptr if the index is out of
      * bounds, which is exactly what we want.
      */
     ret = index234(t, idx);
-    if (ret && index)
-        *index = idx;
+    if (ret && index) *index = idx;
     return ret;
 }
-void *find234(tree234 *t, void *e, cmpfn234 cmp) {
-    return findrelpos234(t, e, cmp, REL234_EQ, NULL);
+void* find234(tree234* t, void* e, cmpfn234 cmp) {
+    return findrelpos234(t, e, cmp, REL234_EQ, nullptr);
 }
-void *findrel234(tree234 *t, void *e, cmpfn234 cmp, int relation) {
-    return findrelpos234(t, e, cmp, relation, NULL);
+void* findrel234(tree234* t, void* e, cmpfn234 cmp, int relation) {
+    return findrelpos234(t, e, cmp, relation, nullptr);
 }
-void *findpos234(tree234 *t, void *e, cmpfn234 cmp, int *index) {
+void* findpos234(tree234* t, void* e, cmpfn234 cmp, int* index) {
     return findrelpos234(t, e, cmp, REL234_EQ, index);
 }
 
@@ -628,7 +600,7 @@ void *findpos234(tree234 *t, void *e, cmpfn234 cmp, int *index) {
  *                /     \    ->             /     \
  *  [more] a A b B c     d        [more] a A b   c C d
  */
-static void trans234_subtree_right(node234 *n, int ki, int *k, int *index) {
+static void trans234_subtree_right(node234* n, int ki, int* k, int* index) {
     node234 *src, *dest;
     int i, srclen, adjust;
 
@@ -662,15 +634,14 @@ static void trans234_subtree_right(node234 *n, int ki, int *k, int *index) {
 
     dest->elems[0] = n->elems[ki];
     n->elems[ki] = src->elems[i];
-    src->elems[i] = NULL;
+    src->elems[i] = nullptr;
 
     dest->kids[0] = src->kids[i + 1];
     dest->counts[0] = src->counts[i + 1];
-    src->kids[i + 1] = NULL;
+    src->kids[i + 1] = nullptr;
     src->counts[i + 1] = 0;
 
-    if (dest->kids[0])
-        dest->kids[0]->parent = dest;
+    if (dest->kids[0]) dest->kids[0]->parent = dest;
 
     adjust = dest->counts[0] + 1;
 
@@ -717,7 +688,7 @@ static void trans234_subtree_right(node234 *n, int ki, int *k, int *index) {
  *    /     \                 ->        /     \
  *   a   b B c C d [more]            a A b   c C d [more]
  */
-static void trans234_subtree_left(node234 *n, int ki, int *k, int *index) {
+static void trans234_subtree_left(node234* n, int ki, int* k, int* index) {
     node234 *src, *dest;
     int i, adjust;
 
@@ -743,8 +714,7 @@ static void trans234_subtree_left(node234 *n, int ki, int *k, int *index) {
     dest->kids[i + 1] = src->kids[0];
     dest->counts[i + 1] = src->counts[0];
 
-    if (dest->kids[i + 1])
-        dest->kids[i + 1]->parent = dest;
+    if (dest->kids[i + 1]) dest->kids[i + 1]->parent = dest;
 
     /*
      * Move over the rest of the source node.
@@ -757,8 +727,8 @@ static void trans234_subtree_left(node234 *n, int ki, int *k, int *index) {
     src->elems[1] = src->elems[2];
     src->kids[2] = src->kids[3];
     src->counts[2] = src->counts[3];
-    src->elems[2] = NULL;
-    src->kids[3] = NULL;
+    src->elems[2] = nullptr;
+    src->kids[3] = nullptr;
     src->counts[3] = 0;
 
     adjust = dest->counts[i + 1] + 1;
@@ -809,7 +779,7 @@ static void trans234_subtree_left(node234 *n, int ki, int *k, int *index) {
  *   /     \       ->        |
  *  a   b B c C d      a A b B c C d
  */
-static void trans234_subtree_merge(node234 *n, int ki, int *k, int *index) {
+static void trans234_subtree_merge(node234* n, int ki, int* k, int* index) {
     node234 *left, *right;
     int i, leftlen, rightlen, lsize, rsize;
 
@@ -838,10 +808,8 @@ static void trans234_subtree_merge(node234 *n, int ki, int *k, int *index) {
     for (i = 0; i < rsize + 1; i++) {
         left->kids[lsize + 1 + i] = right->kids[i];
         left->counts[lsize + 1 + i] = right->counts[i];
-        if (left->kids[lsize + 1 + i])
-            left->kids[lsize + 1 + i]->parent = left;
-        if (i < rsize)
-            left->elems[lsize + 1 + i] = right->elems[i];
+        if (left->kids[lsize + 1 + i]) left->kids[lsize + 1 + i]->parent = left;
+        if (i < rsize) left->elems[lsize + 1 + i] = right->elems[i];
     }
 
     n->counts[ki] += rightlen + 1;
@@ -858,9 +826,9 @@ static void trans234_subtree_merge(node234 *n, int ki, int *k, int *index) {
     for (i = ki; i < 2; i++) {
         n->elems[i] = n->elems[i + 1];
     }
-    n->kids[3] = NULL;
+    n->kids[3] = nullptr;
     n->counts[3] = 0;
-    n->elems[2] = NULL;
+    n->elems[2] = nullptr;
 
     if (k) {
         LOG(("    before: k,index = %d,%d\n", (*k), (*index)));
@@ -885,17 +853,17 @@ static void trans234_subtree_merge(node234 *n, int ki, int *k, int *index) {
  * Delete an element e in a 2-3-4 tree. Does not free the element,
  * merely removes all links to it from the tree nodes.
  */
-static void *delpos234_internal(tree234 *t, int index) {
-    node234 *n;
-    void *retval;
+static void* delpos234_internal(tree234* t, int index) {
+    node234* n;
+    void* retval;
     int ki, i;
 
-    retval = NULL;
+    retval = nullptr;
 
-    n = t->root; /* by assumption this is non-NULL */
+    n = t->root; /* by assumption this is non-nullptr */
     LOG(("deleting item %d from tree %p\n", index, t));
     while (1) {
-        node234 *sub;
+        node234* sub;
 
         LOG(("  node %p: %p/%d \"%s\" %p/%d \"%s\" %p/%d \"%s\" %p/%d index=%d\n", n, n->kids[0],
              n->counts[0], n->elems[0], n->kids[1], n->counts[1], n->elems[1], n->kids[2],
@@ -912,8 +880,7 @@ static void *delpos234_internal(tree234 *t, int index) {
             assert(0); /* can't happen */
         }
 
-        if (!n->kids[0])
-            break; /* n is a leaf node; we're here! */
+        if (!n->kids[0]) break; /* n is a leaf node; we're here! */
 
         /*
          * Check to see if we've found our target element. If so,
@@ -923,13 +890,12 @@ static void *delpos234_internal(tree234 *t, int index) {
          * delete the old copy of the new target.
          */
         if (index == n->counts[ki]) {
-            node234 *m;
+            node234* m;
             LOG(("  found element in internal node, index %d\n", ki));
             assert(n->elems[ki]); /* must be a kid _before_ an element */
             ki++;
             index = 0;
-            for (m = n->kids[ki]; m->kids[0]; m = m->kids[0])
-                continue;
+            for (m = n->kids[ki]; m->kids[0]; m = m->kids[0]) continue;
             LOG(("  replacing with element \"%s\" from leaf node %p\n", m->elems[0], m));
             retval = n->elems[ki - 1];
             n->elems[ki - 1] = m->elems[0];
@@ -971,15 +937,14 @@ static void *delpos234_internal(tree234 *t, int index) {
                      */
                     LOG(("  shifting root!\n"));
                     t->root = sub;
-                    sub->parent = NULL;
+                    sub->parent = nullptr;
                     sfree(n);
-                    n = NULL;
+                    n = nullptr;
                 }
             }
         }
 
-        if (n)
-            n->counts[ki]--;
+        if (n) n->counts[ki]--;
         n = sub;
     }
 
@@ -989,12 +954,10 @@ static void *delpos234_internal(tree234 *t, int index) {
      * bigger than minimum size, so let's just go to it.
      */
     assert(!n->kids[0]);
-    if (!retval)
-        retval = n->elems[ki];
+    if (!retval) retval = n->elems[ki];
 
-    for (i = ki; i < 2 && n->elems[i + 1]; i++)
-        n->elems[i] = n->elems[i + 1];
-    n->elems[i] = NULL;
+    for (i = ki; i < 2 && n->elems[i + 1]; i++) n->elems[i] = n->elems[i + 1];
+    n->elems[i] = nullptr;
 
     /*
      * It's just possible that we have reduced the leaf to zero
@@ -1005,20 +968,19 @@ static void *delpos234_internal(tree234 *t, int index) {
         LOG(("  removed last element in tree, destroying empty root\n"));
         assert(n == t->root);
         sfree(n);
-        t->root = NULL;
+        t->root = nullptr;
     }
 
     return retval; /* finished! */
 }
-void *delpos234(tree234 *t, int index) {
-    if (index < 0 || index >= countnode234(t->root))
-        return NULL;
+void* delpos234(tree234* t, int index) {
+    if (index < 0 || index >= countnode234(t->root)) return nullptr;
     return delpos234_internal(t, index);
 }
-void *del234(tree234 *t, void *e) {
+void* del234(tree234* t, void* e) {
     int index;
-    if (!findrelpos234(t, e, NULL, REL234_EQ, &index))
-        return NULL;                     /* it wasn't in there anyway */
+    if (!findrelpos234(t, e, nullptr, REL234_EQ, &index))
+        return nullptr;                  /* it wasn't in there anyway */
     return delpos234_internal(t, index); /* it's there; delete it. */
 }
 
@@ -1036,7 +998,7 @@ void *del234(tree234 *t, void *e) {
  * resulting tree is the same height as the original larger one, or
  * one higher.
  */
-static node234 *join234_internal(node234 *left, void *sep, node234 *right, int *height) {
+static node234* join234_internal(node234* left, void* sep, node234* right, int* height) {
     node234 *root, *node;
     int relht = *height;
     int ki;
@@ -1048,24 +1010,22 @@ static node234 *join234_internal(node234 *left, void *sep, node234 *right, int *
          * root containing the separator and pointers to the two
          * nodes.
          */
-        node234 *newroot;
+        node234* newroot;
         newroot = snew(node234);
         newroot->kids[0] = left;
         newroot->counts[0] = countnode234(left);
         newroot->elems[0] = sep;
         newroot->kids[1] = right;
         newroot->counts[1] = countnode234(right);
-        newroot->elems[1] = NULL;
-        newroot->kids[2] = NULL;
+        newroot->elems[1] = nullptr;
+        newroot->kids[2] = nullptr;
         newroot->counts[2] = 0;
-        newroot->elems[2] = NULL;
-        newroot->kids[3] = NULL;
+        newroot->elems[2] = nullptr;
+        newroot->kids[3] = nullptr;
         newroot->counts[3] = 0;
-        newroot->parent = NULL;
-        if (left)
-            left->parent = newroot;
-        if (right)
-            right->parent = newroot;
+        newroot->parent = nullptr;
+        if (left) left->parent = newroot;
+        if (right) right->parent = newroot;
         *height = 1;
         LOG(("  join: same height, brand new root\n"));
         return newroot;
@@ -1119,52 +1079,50 @@ static node234 *join234_internal(node234 *left, void *sep, node234 *right, int *
 
     return root;
 }
-static int height234(tree234 *t) {
+static int height234(tree234* t) {
     int level = 0;
-    node234 *n = t->root;
+    node234* n = t->root;
     while (n) {
         level++;
         n = n->kids[0];
     }
     return level;
 }
-tree234 *join234(tree234 *t1, tree234 *t2) {
+tree234* join234(tree234* t1, tree234* t2) {
     int size2 = countnode234(t2->root);
     if (size2 > 0) {
-        void *element;
+        void* element;
         int relht;
 
         if (t1->cmp) {
             element = index234(t2, 0);
-            element = findrelpos234(t1, element, NULL, REL234_GE, NULL);
-            if (element)
-                return NULL;
+            element = findrelpos234(t1, element, nullptr, REL234_GE, nullptr);
+            if (element) return nullptr;
         }
 
         element = delpos234(t2, 0);
         relht = height234(t1) - height234(t2);
         t1->root = join234_internal(t1->root, element, t2->root, &relht);
-        t2->root = NULL;
+        t2->root = nullptr;
     }
     return t1;
 }
-tree234 *join234r(tree234 *t1, tree234 *t2) {
+tree234* join234r(tree234* t1, tree234* t2) {
     int size1 = countnode234(t1->root);
     if (size1 > 0) {
-        void *element;
+        void* element;
         int relht;
 
         if (t2->cmp) {
             element = index234(t1, size1 - 1);
-            element = findrelpos234(t2, element, NULL, REL234_LE, NULL);
-            if (element)
-                return NULL;
+            element = findrelpos234(t2, element, nullptr, REL234_LE, nullptr);
+            if (element) return nullptr;
         }
 
         element = delpos234(t1, size1 - 1);
         relht = height234(t1) - height234(t2);
         t2->root = join234_internal(t1->root, element, t2->root, &relht);
-        t1->root = NULL;
+        t1->root = nullptr;
     }
     return t2;
 }
@@ -1174,8 +1132,8 @@ tree234 *join234r(tree234 *t1, tree234 *t2) {
  * pointer to the root node. Leave the root node of the remainder
  * in t.
  */
-static node234 *split234_internal(tree234 *t, int index) {
-    node234 *halves[2] = {NULL, NULL}, *n, *sib, *sub;
+static node234* split234_internal(tree234* t, int index) {
+    node234 *halves[2] = {nullptr, nullptr}, *n, *sib, *sub;
     node234 *lparent, *rparent;
     int ki, pki, i, half, lcount, rcount;
 
@@ -1187,18 +1145,18 @@ static node234 *split234_internal(tree234 *t, int index) {
      * with the empty-tree case and we can assume the root exists.
      */
     if (index == 0) /* return nothing */
-        return NULL;
+        return nullptr;
     if (index == countnode234(t->root)) { /* return the whole tree */
-        node234 *ret = t->root;
-        t->root = NULL;
+        node234* ret = t->root;
+        t->root = nullptr;
         return ret;
     }
 
     /*
      * Search down the tree to find the split point.
      */
-    halves[0] = halves[1] = NULL;
-    lparent = rparent = NULL;
+    halves[0] = halves[1] = nullptr;
+    lparent = rparent = nullptr;
     pki = -1;
     while (n) {
         LOG(("  node %p: %p/%d \"%s\" %p/%d \"%s\" %p/%d \"%s\" %p/%d index=%d\n", n, n->kids[0],
@@ -1233,15 +1191,14 @@ static node234 *split234_internal(tree234 *t, int index) {
             if (i + ki < 3 && n->elems[i + ki]) {
                 sib->elems[i] = n->elems[i + ki];
                 sib->kids[i + 1] = n->kids[i + ki + 1];
-                if (sib->kids[i + 1])
-                    sib->kids[i + 1]->parent = sib;
+                if (sib->kids[i + 1]) sib->kids[i + 1]->parent = sib;
                 sib->counts[i + 1] = n->counts[i + ki + 1];
-                n->elems[i + ki] = NULL;
-                n->kids[i + ki + 1] = NULL;
+                n->elems[i + ki] = nullptr;
+                n->kids[i + ki + 1] = nullptr;
                 n->counts[i + ki + 1] = 0;
             } else {
-                sib->elems[i] = NULL;
-                sib->kids[i + 1] = NULL;
+                sib->elems[i] = nullptr;
+                sib->kids[i + 1] = nullptr;
                 sib->counts[i + 1] = 0;
             }
         }
@@ -1254,9 +1211,9 @@ static node234 *split234_internal(tree234 *t, int index) {
             sib->parent = rparent;
         } else {
             halves[0] = n;
-            n->parent = NULL;
+            n->parent = nullptr;
             halves[1] = sib;
-            sib->parent = NULL;
+            sib->parent = nullptr;
         }
         lparent = n;
         rparent = sib;
@@ -1279,10 +1236,10 @@ static node234 *split234_internal(tree234 *t, int index) {
      * tree, that means they'll be zero-element one-child nodes.)
      */
     LOG(("  fell off bottom, lroot is %p, rroot is %p\n", halves[0], halves[1]));
-    assert(halves[0] != NULL);
-    assert(halves[1] != NULL);
+    assert(halves[0] != nullptr);
+    assert(halves[1] != nullptr);
     lparent->counts[pki] = rparent->counts[0] = 0;
-    lparent->kids[pki] = rparent->kids[0] = NULL;
+    lparent->kids[pki] = rparent->kids[0] = nullptr;
 
     /*
      * So now we go back down the tree from each of the two roots,
@@ -1298,13 +1255,13 @@ static node234 *split234_internal(tree234 *t, int index) {
             LOG(("  root %p is undersize, throwing away\n", halves[half]));
             halves[half] = halves[half]->kids[0];
             sfree(halves[half]->parent);
-            halves[half]->parent = NULL;
+            halves[half]->parent = nullptr;
             LOG(("  new root is %p\n", halves[half]));
         }
 
         n = halves[half];
         while (n) {
-            void (*toward)(node234 *n, int ki, int *k, int *index);
+            void (*toward)(node234* n, int ki, int* k, int* index);
             int ni, merge;
 
             /*
@@ -1349,7 +1306,7 @@ static node234 *split234_internal(tree234 *t, int index) {
                      * Neighbour is small, or possibly neighbour is
                      * medium and we are undersize.
                      */
-                    trans234_subtree_merge(n, merge, NULL, NULL);
+                    trans234_subtree_merge(n, merge, nullptr, nullptr);
                     sub = n->kids[merge];
                     if (!n->elems[0]) {
                         /*
@@ -1359,14 +1316,13 @@ static node234 *split234_internal(tree234 *t, int index) {
                         assert(!n->parent);
                         LOG(("  shifting root!\n"));
                         halves[half] = sub;
-                        halves[half]->parent = NULL;
+                        halves[half]->parent = nullptr;
                         sfree(n);
                     }
                 } else {
                     /* Neighbour is big enough to move trees over. */
-                    toward(n, ni, NULL, NULL);
-                    if (undersized)
-                        toward(n, ni, NULL, NULL);
+                    toward(n, ni, nullptr, nullptr);
+                    if (undersized) toward(n, ni, nullptr, nullptr);
                 }
             }
             n = sub;
@@ -1376,14 +1332,13 @@ static node234 *split234_internal(tree234 *t, int index) {
     t->root = halves[1];
     return halves[0];
 }
-tree234 *splitpos234(tree234 *t, int index, int before) {
-    tree234 *ret;
-    node234 *n;
+tree234* splitpos234(tree234* t, int index, bool before) {
+    tree234* ret;
+    node234* n;
     int count;
 
     count = countnode234(t->root);
-    if (index < 0 || index > count)
-        return NULL; /* error */
+    if (index < 0 || index > count) return nullptr; /* error */
     ret = newtree234(t->cmp);
     n = split234_internal(t, index);
     if (before) {
@@ -1399,27 +1354,26 @@ tree234 *splitpos234(tree234 *t, int index, int before) {
     }
     return ret;
 }
-tree234 *split234(tree234 *t, void *e, cmpfn234 cmp, int rel) {
-    int before;
+tree234* split234(tree234* t, void* e, cmpfn234 cmp, int rel) {
+    bool before;
     int index;
 
     assert(rel != REL234_EQ);
 
     if (rel == REL234_GT || rel == REL234_GE) {
-        before = 1;
+        before = true;
         rel = (rel == REL234_GT ? REL234_LE : REL234_LT);
     } else {
-        before = 0;
+        before = false;
     }
-    if (!findrelpos234(t, e, cmp, rel, &index))
-        index = 0;
+    if (!findrelpos234(t, e, cmp, rel, &index)) index = 0;
 
     return splitpos234(t, index + 1, before);
 }
 
-static node234 *copynode234(node234 *n, copyfn234 copyfn, void *copyfnstate) {
+static node234* copynode234(node234* n, copyfn234 copyfn, void* copyfnstate) {
     int i;
-    node234 *n2 = snew(node234);
+    node234* n2 = snew(node234);
 
     for (i = 0; i < 3; i++) {
         if (n->elems[i] && copyfn)
@@ -1433,22 +1387,22 @@ static node234 *copynode234(node234 *n, copyfn234 copyfn, void *copyfnstate) {
             n2->kids[i] = copynode234(n->kids[i], copyfn, copyfnstate);
             n2->kids[i]->parent = n2;
         } else {
-            n2->kids[i] = NULL;
+            n2->kids[i] = nullptr;
         }
         n2->counts[i] = n->counts[i];
     }
 
     return n2;
 }
-tree234 *copytree234(tree234 *t, copyfn234 copyfn, void *copyfnstate) {
-    tree234 *t2;
+tree234* copytree234(tree234* t, copyfn234 copyfn, void* copyfnstate) {
+    tree234* t2;
 
     t2 = newtree234(t->cmp);
     if (t->root) {
         t2->root = copynode234(t->root, copyfn, copyfnstate);
-        t2->root->parent = NULL;
+        t2->root->parent = nullptr;
     } else
-        t2->root = NULL;
+        t2->root = nullptr;
 
     return t2;
 }
@@ -1462,12 +1416,12 @@ tree234 *copytree234(tree234 *t, copyfn234 copyfn, void *copyfnstate) {
  * operation, the verify() function is called, which ensures all
  * the tree properties are preserved:
  *  - node->child->parent always equals node
- *  - tree->root->parent always equals NULL
+ *  - tree->root->parent always equals nullptr
  *  - number of kids == 0 or number of elements + 1;
  *  - tree has the same depth everywhere
  *  - every node has at least one element
  *  - subtree element counts are accurate
- *  - any NULL kid pointer is accompanied by a zero count
+ *  - any nullptr kid pointer is accompanied by a zero count
  *  - in a sorted tree: ordering property between elements of a
  *    node and elements of its children is preserved
  * and also ensures the list represented by the tree is the same
@@ -1486,7 +1440,7 @@ tree234 *copytree234(tree234 *t, copyfn234 copyfn, void *copyfnstate) {
 /*
  * Error reporting function.
  */
-void error(char *fmt, ...) {
+void error(char* fmt, ...) {
     va_list ap;
     printf("ERROR: ");
     va_start(ap, fmt);
@@ -1496,12 +1450,12 @@ void error(char *fmt, ...) {
 }
 
 /* The array representation of the data. */
-void **array;
+void** array;
 int arraylen, arraysize;
 cmpfn234 cmp;
 
 /* The tree representation of the same data. */
-tree234 *tree;
+tree234* tree;
 
 /*
  * Routines to provide a diagnostic printout of a tree. Currently
@@ -1509,10 +1463,10 @@ tree234 *tree;
  * :-)
  */
 typedef struct {
-    char **levels;
+    char** levels;
 } dispctx;
 
-int dispnode(node234 *n, int level, dispctx *ctx) {
+int dispnode(node234* n, int level, dispctx* ctx) {
     if (level == 0) {
         int xpos = strlen(ctx->levels[0]);
         int len;
@@ -1552,10 +1506,8 @@ int dispnode(node234 *n, int level, dispctx *ctx) {
         assert(myleft + nodelen - 1 <= xpos[nkids - 1]);
 
         x = strlen(ctx->levels[level]);
-        while (x <= xpos[0] && x < myleft)
-            ctx->levels[level][x++] = ' ';
-        while (x < myleft)
-            ctx->levels[level][x++] = '_';
+        while (x <= xpos[0] && x < myleft) ctx->levels[level][x++] = ' ';
+        while (x < myleft) ctx->levels[level][x++] = '_';
         if (nkids == 4)
             x += sprintf(ctx->levels[level] + x, ".%s.%s.%s.", n->elems[0], n->elems[1],
                          n->elems[2]);
@@ -1563,8 +1515,7 @@ int dispnode(node234 *n, int level, dispctx *ctx) {
             x += sprintf(ctx->levels[level] + x, ".%s.%s.", n->elems[0], n->elems[1]);
         else
             x += sprintf(ctx->levels[level] + x, ".%s.", n->elems[0]);
-        while (x < xpos[nkids - 1])
-            ctx->levels[level][x++] = '_';
+        while (x < xpos[nkids - 1]) ctx->levels[level][x++] = '_';
         ctx->levels[level][x] = '\0';
 
         x = strlen(ctx->levels[level - 1]);
@@ -1575,16 +1526,11 @@ int dispnode(node234 *n, int level, dispctx *ctx) {
                 pos = myleft + 2 * i;
             else
                 pos = rpos;
-            if (rpos < pos)
-                rpos++;
-            while (x < pos && x < rpos)
-                ctx->levels[level - 1][x++] = ' ';
-            if (x == pos)
-                ctx->levels[level - 1][x++] = '|';
-            while (x < pos || x < rpos)
-                ctx->levels[level - 1][x++] = '_';
-            if (x == pos)
-                ctx->levels[level - 1][x++] = '|';
+            if (rpos < pos) rpos++;
+            while (x < pos && x < rpos) ctx->levels[level - 1][x++] = ' ';
+            if (x == pos) ctx->levels[level - 1][x++] = '|';
+            while (x < pos || x < rpos) ctx->levels[level - 1][x++] = '_';
+            if (x == pos) ctx->levels[level - 1][x++] = '|';
         }
         ctx->levels[level - 1][x] = '\0';
 
@@ -1592,8 +1538,7 @@ int dispnode(node234 *n, int level, dispctx *ctx) {
         for (i = 0; i < nkids; i++) {
             int rpos = xpos[i];
 
-            while (x < rpos)
-                ctx->levels[level - 2][x++] = ' ';
+            while (x < rpos) ctx->levels[level - 2][x++] = ' ';
             ctx->levels[level - 2][x++] = '|';
         }
         ctx->levels[level - 2][x] = '\0';
@@ -1602,9 +1547,9 @@ int dispnode(node234 *n, int level, dispctx *ctx) {
     }
 }
 
-void disptree(tree234 *t) {
+void disptree(tree234* t) {
     dispctx ctx;
-    char *leveldata;
+    char* leveldata;
     int width = count234(t);
     int ht = height234(t) * 3 - 2;
     int i;
@@ -1614,7 +1559,7 @@ void disptree(tree234 *t) {
     }
 
     leveldata = smalloc(ht * (width + 2));
-    ctx.levels = smalloc(ht * sizeof(char *));
+    ctx.levels = smalloc(ht * sizeof(char*));
     for (i = 0; i < ht; i++) {
         ctx.levels[i] = leveldata + i * (width + 2);
         ctx.levels[i][0] = '\0';
@@ -1622,8 +1567,7 @@ void disptree(tree234 *t) {
 
     (void)dispnode(t->root, ht - 1, &ctx);
 
-    for (i = ht; i--;)
-        printf("%s\n", ctx.levels[i]);
+    for (i = ht; i--;) printf("%s\n", ctx.levels[i]);
 
     sfree(ctx.levels);
     sfree(leveldata);
@@ -1634,15 +1578,14 @@ typedef struct {
     int elemcount;
 } chkctx;
 
-int chknode(chkctx *ctx, int level, node234 *node, void *lowbound, void *highbound) {
+int chknode(chkctx* ctx, int level, node234* node, void* lowbound, void* highbound) {
     int nkids, nelems;
     int i;
     int count;
 
-    /* Count the non-NULL kids. */
-    for (nkids = 0; nkids < 4 && node->kids[nkids]; nkids++)
-        ;
-    /* Ensure no kids beyond the first NULL are non-NULL. */
+    /* Count the non-nullptr kids. */
+    for (nkids = 0; nkids < 4 && node->kids[nkids]; nkids++);
+    /* Ensure no kids beyond the first nullptr are non-nullptr. */
     for (i = nkids; i < 4; i++)
         if (node->kids[i]) {
             error("node %p: nkids=%d but kids[%d] non-NULL", node, nkids, i);
@@ -1650,10 +1593,9 @@ int chknode(chkctx *ctx, int level, node234 *node, void *lowbound, void *highbou
             error("node %p: kids[%d] NULL but count[%d]=%d nonzero", node, i, i, node->counts[i]);
         }
 
-    /* Count the non-NULL elements. */
-    for (nelems = 0; nelems < 3 && node->elems[nelems]; nelems++)
-        ;
-    /* Ensure no elements beyond the first NULL are non-NULL. */
+    /* Count the non-nullptr elements. */
+    for (nelems = 0; nelems < 3 && node->elems[nelems]; nelems++);
+    /* Ensure no elements beyond the first nullptr are non-nullptr. */
     for (i = nelems; i < 3; i++)
         if (node->elems[i]) {
             error("node %p: nelems=%d but elems[%d] non-NULL", node, nelems, i);
@@ -1697,14 +1639,14 @@ int chknode(chkctx *ctx, int level, node234 *node, void *lowbound, void *highbou
     /*
      * Check ordering property: all elements should be strictly >
      * lowbound, strictly < highbound, and strictly < each other in
-     * sequence. (lowbound and highbound are NULL at edges of tree
-     * - both NULL at root node - and NULL is considered to be <
+     * sequence. (lowbound and highbound are nullptr at edges of tree
+     * - both nullptr at root node - and nullptr is considered to be <
      * everything and > everything. IYSWIM.)
      */
     if (cmp) {
         for (i = -1; i < nelems; i++) {
-            void *lower = (i == -1 ? lowbound : node->elems[i]);
-            void *higher = (i + 1 == nelems ? highbound : node->elems[i + 1]);
+            void* lower = (i == -1 ? lowbound : node->elems[i]);
+            void* higher = (i + 1 == nelems ? highbound : node->elems[i + 1]);
             if (lower && higher && cmp(lower, higher) >= 0) {
                 error("node %p: kid comparison [%d=%s,%d=%s] failed", node, i, lower, i + 1,
                       higher);
@@ -1713,7 +1655,7 @@ int chknode(chkctx *ctx, int level, node234 *node, void *lowbound, void *highbou
     }
 
     /*
-     * Check parent pointers: all non-NULL kids should have a
+     * Check parent pointers: all non-nullptr kids should have a
      * parent pointer coming back to this node.
      */
     for (i = 0; i < nkids; i++)
@@ -1727,8 +1669,8 @@ int chknode(chkctx *ctx, int level, node234 *node, void *lowbound, void *highbou
     count = nelems;
 
     for (i = 0; i < nkids; i++) {
-        void *lower = (i == 0 ? lowbound : node->elems[i - 1]);
-        void *higher = (i >= nelems ? highbound : node->elems[i]);
+        void* lower = (i == 0 ? lowbound : node->elems[i - 1]);
+        void* higher = (i >= nelems ? highbound : node->elems[i]);
         int subcount = chknode(ctx, level + 1, node->kids[i], lower, higher);
         if (node->counts[i] != subcount) {
             error("node %p kid %d: count says %d, subtree really has %d", node, i, node->counts[i],
@@ -1740,10 +1682,10 @@ int chknode(chkctx *ctx, int level, node234 *node, void *lowbound, void *highbou
     return count;
 }
 
-void verifytree(tree234 *tree, void **array, int arraylen) {
+void verifytree(tree234* tree, void** array, int arraylen) {
     chkctx ctx;
     int i;
-    void *p;
+    void* p;
 
     ctx.treedepth = -1; /* depth unknown yet */
     ctx.elemcount = 0;  /* no elements seen yet */
@@ -1751,17 +1693,16 @@ void verifytree(tree234 *tree, void **array, int arraylen) {
      * Verify validity of tree properties.
      */
     if (tree->root) {
-        if (tree->root->parent != NULL)
+        if (tree->root->parent != nullptr)
             error("root->parent is %p should be null", tree->root->parent);
-        chknode(&ctx, 0, tree->root, NULL, NULL);
+        chknode(&ctx, 0, tree->root, nullptr, nullptr);
     }
     printf("tree depth: %d\n", ctx.treedepth);
     /*
      * Enumerate the tree and ensure it matches up to the array.
      */
-    for (i = 0; NULL != (p = index234(tree, i)); i++) {
-        if (i >= arraylen)
-            error("tree contains more than %d elements", arraylen);
+    for (i = 0; nullptr != (p = index234(tree, i)); i++) {
+        if (i >= arraylen) error("tree contains more than %d elements", arraylen);
         if (array[i] != p)
             error("enum at position %d: array says %s, tree says %s", i, array[i], p);
     }
@@ -1780,21 +1721,20 @@ void verify(void) {
     verifytree(tree, array, arraylen);
 }
 
-void internal_addtest(void *elem, int index, void *realret) {
+void internal_addtest(void* elem, int index, void* realret) {
     int i, j;
-    void *retval;
+    void* retval;
 
     if (arraysize < arraylen + 1) {
         arraysize = arraylen + 1 + 256;
-        array = (array == NULL ? smalloc(arraysize * sizeof(*array))
-                               : srealloc(array, arraysize * sizeof(*array)));
+        array = (array == nullptr ? smalloc(arraysize * sizeof(*array))
+                                  : srealloc(array, arraysize * sizeof(*array)));
     }
 
     i = index;
     /* now i points to the first element >= elem */
     retval = elem; /* expect elem returned (success) */
-    for (j = arraylen; j > i; j--)
-        array[j] = array[j - 1];
+    for (j = arraylen; j > i; j--) array[j] = array[j - 1];
     array[i] = elem; /* add elem to array */
     arraylen++;
 
@@ -1805,17 +1745,16 @@ void internal_addtest(void *elem, int index, void *realret) {
     verify();
 }
 
-void addtest(void *elem) {
+void addtest(void* elem) {
     int i;
-    void *realret;
+    void* realret;
 
     realret = add234(tree, elem);
 
     i = 0;
-    while (i < arraylen && cmp(elem, array[i]) > 0)
-        i++;
+    while (i < arraylen && cmp(elem, array[i]) > 0) i++;
     if (i < arraylen && !cmp(elem, array[i])) {
-        void *retval = array[i]; /* expect that returned not elem */
+        void* retval = array[i]; /* expect that returned not elem */
         if (realret != retval) {
             error("add: retval was %p expected %p", realret, retval);
         }
@@ -1823,8 +1762,8 @@ void addtest(void *elem) {
         internal_addtest(elem, i, realret);
 }
 
-void addpostest(void *elem, int i) {
-    void *realret;
+void addpostest(void* elem, int i) {
+    void* realret;
 
     realret = addpos234(tree, elem, i);
 
@@ -1854,14 +1793,12 @@ void delpostest(int i) {
     verify();
 }
 
-void deltest(void *elem) {
+void deltest(void* elem) {
     int i;
 
     i = 0;
-    while (i < arraylen && cmp(elem, array[i]) > 0)
-        i++;
-    if (i >= arraylen || cmp(elem, array[i]) != 0)
-        return; /* don't do it! */
+    while (i < arraylen && cmp(elem, array[i]) > 0) i++;
+    if (i >= arraylen || cmp(elem, array[i]) != 0) return; /* don't do it! */
     delpostest(i);
 }
 
@@ -1873,19 +1810,19 @@ void deltest(void *elem) {
  * given in ANSI C99 draft N869. It assumes `unsigned' is 32 bits;
  * change it if not.
  */
-int randomnumber(unsigned *seed) {
+int randomnumber(unsigned* seed) {
     *seed *= 1103515245;
     *seed += 12345;
     return ((*seed) / 65536) % 32768;
 }
 
-int mycmp(void *av, void *bv) {
-    char const *a = (char const *)av;
-    char const *b = (char const *)bv;
+int mycmp(void* av, void* bv) {
+    char const* a = (char const*)av;
+    char const* b = (char const*)bv;
     return strcmp(a, b);
 }
 
-char *strings[] = {
+char* strings[] = {
     "0", "2", "3", "I", "K", "d", "H", "J", "Q", "N", "n", "q", "j", "i", "7",
     "G", "F", "D", "b", "x", "g", "B", "e", "v", "V", "T", "f", "E", "S", "8",
     "A", "k", "X", "p", "C", "R", "a", "o", "r", "O", "Z", "u", "6", "1", "w",
@@ -1909,7 +1846,7 @@ char *strings[] = {
 
 void findtest(void) {
     static const int rels[] = {REL234_EQ, REL234_GE, REL234_LE, REL234_LT, REL234_GT};
-    static const char *const relnames[] = {"EQ", "GE", "LE", "LT", "GT"};
+    static const char* const relnames[] = {"EQ", "GE", "LE", "LT", "GT"};
     int i, j, rel, index;
     char *p, *ret, *realret, *realret2;
     int lo, hi, mid, c;
@@ -1934,24 +1871,24 @@ void findtest(void) {
 
             if (c == 0) {
                 if (rel == REL234_LT)
-                    ret = (mid > 0 ? array[--mid] : NULL);
+                    ret = (mid > 0 ? array[--mid] : nullptr);
                 else if (rel == REL234_GT)
-                    ret = (mid < arraylen - 1 ? array[++mid] : NULL);
+                    ret = (mid < arraylen - 1 ? array[++mid] : nullptr);
                 else
                     ret = array[mid];
             } else {
                 assert(lo == hi + 1);
                 if (rel == REL234_LT || rel == REL234_LE) {
                     mid = hi;
-                    ret = (hi >= 0 ? array[hi] : NULL);
+                    ret = (hi >= 0 ? array[hi] : nullptr);
                 } else if (rel == REL234_GT || rel == REL234_GE) {
                     mid = lo;
-                    ret = (lo < arraylen ? array[lo] : NULL);
+                    ret = (lo < arraylen ? array[lo] : nullptr);
                 } else
-                    ret = NULL;
+                    ret = nullptr;
             }
 
-            realret = findrelpos234(tree, p, NULL, rel, &index);
+            realret = findrelpos234(tree, p, nullptr, rel, &index);
             if (realret != ret) {
                 error("find(\"%s\",%s) gave %s should be %s", p, relnames[j], realret, ret);
             }
@@ -1972,26 +1909,26 @@ void findtest(void) {
         }
     }
 
-    realret = findrelpos234(tree, NULL, NULL, REL234_GT, &index);
+    realret = findrelpos234(tree, nullptr, nullptr, REL234_GT, &index);
     if (arraylen && (realret != array[0] || index != 0)) {
         error("find(NULL,GT) gave %s(%d) should be %s(0)", realret, index, array[0]);
-    } else if (!arraylen && (realret != NULL)) {
+    } else if (!arraylen && (realret != nullptr)) {
         error("find(NULL,GT) gave %s(%d) should be NULL", realret, index);
     }
 
-    realret = findrelpos234(tree, NULL, NULL, REL234_LT, &index);
+    realret = findrelpos234(tree, nullptr, nullptr, REL234_LT, &index);
     if (arraylen && (realret != array[arraylen - 1] || index != arraylen - 1)) {
         error("find(NULL,LT) gave %s(%d) should be %s(0)", realret, index, array[arraylen - 1]);
-    } else if (!arraylen && (realret != NULL)) {
+    } else if (!arraylen && (realret != nullptr)) {
         error("find(NULL,LT) gave %s(%d) should be NULL", realret, index);
     }
 }
 
-void splittest(tree234 *tree, void **array, int arraylen) {
+void splittest(tree234* tree, void** array, int arraylen) {
     int i;
     tree234 *tree3, *tree4;
     for (i = 0; i <= arraylen; i++) {
-        tree3 = copytree234(tree, NULL, NULL);
+        tree3 = copytree234(tree, nullptr, nullptr);
         tree4 = splitpos234(tree3, i, 0);
         verifytree(tree3, array, i);
         verifytree(tree4, array + i, arraylen - i);
@@ -2010,11 +1947,10 @@ int main(void) {
     tree234 *tree2, *tree3, *tree4;
     int c;
 
-    setvbuf(stdout, NULL, _IOLBF, 0);
+    setvbuf(stdout, nullptr, _IOLBF, 0);
 
-    for (i = 0; i < (int)NSTR; i++)
-        in[i] = 0;
-    array = NULL;
+    for (i = 0; i < (int)NSTR; i++) in[i] = 0;
+    array = nullptr;
     arraylen = arraysize = 0;
     tree = newtree234(mycmp);
     cmp = mycmp;
@@ -2052,8 +1988,8 @@ int main(void) {
      * completeness we'll use it to tear down our unsorted tree
      * once we've built it.
      */
-    tree = newtree234(NULL);
-    cmp = NULL;
+    tree = newtree234(nullptr);
+    cmp = nullptr;
     verify();
     for (i = 0; i < 1000; i++) {
         printf("trial: %d\n", i);
@@ -2069,7 +2005,7 @@ int main(void) {
      * While we have this tree in its full form, we'll take a copy
      * of it to use in split and join testing.
      */
-    tree2 = copytree234(tree, NULL, NULL);
+    tree2 = copytree234(tree, nullptr, nullptr);
     verifytree(tree2, array, arraylen); /* check the copy is accurate */
     /*
      * Split tests. Split the tree at every possible point and
@@ -2097,7 +2033,7 @@ int main(void) {
         printf("cleanup: tree size %d\n", count234(tree));
         j = randomnumber(&seed);
         j %= count234(tree);
-        printf("deleting string %s from index %d\n", (char *)array[j], j);
+        printf("deleting string %s from index %d\n", (char*)array[j], j);
         delpostest(j);
     }
     freetree234(tree);
@@ -2110,11 +2046,10 @@ int main(void) {
     cmp = mycmp;
     arraylen = 0;
     for (i = 0; i < 17; i++) {
-        tree2 = copytree234(tree, NULL, NULL);
+        tree2 = copytree234(tree, nullptr, nullptr);
         splittest(tree2, array, arraylen);
         freetree234(tree2);
-        if (i < 16)
-            addtest(strings[i]);
+        if (i < 16) addtest(strings[i]);
     }
     freetree234(tree);
 
@@ -2144,7 +2079,7 @@ int main(void) {
      *  - join(tree4,tree3) should leave both tree3 and tree4 unchanged.
      *  - join(tree, tree2) should move the element from tree2 to tree.
      *  - joinr(tree4, tree3) should move the element from tree4 to tree3.
-     *  - join(tree,tree3) should return NULL and leave both unchanged.
+     *  - join(tree,tree3) should return nullptr and leave both unchanged.
      *  - join(tree3,tree) should work and create a bigger tree in tree3.
      */
     assert(tree == join234(tree, tree3));
@@ -2162,7 +2097,7 @@ int main(void) {
     assert(tree3 == join234r(tree4, tree3));
     verifytree(tree3, array, 1);
     verifytree(tree4, array, 0);
-    assert(NULL == join234(tree, tree3));
+    assert(nullptr == join234(tree, tree3));
     verifytree(tree, array + 1, 1);
     verifytree(tree3, array, 1);
     assert(tree3 == join234(tree3, tree));
