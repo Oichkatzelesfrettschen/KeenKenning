@@ -5,8 +5,8 @@
 2. [x] Confirm :app depends on :core and kenningImplementation on :kenning.
 3. [x] Keep Classik baseline in app/src/main; Kenning overrides only in app/src/kenning.
 4. [x] Kenning assets live in kenning/src/main/assets.
-5. [ ] Validate ONNX/narrative asset names match code usage.
-6. [ ] Confirm Classik story gating shows stub (no crash).
+5. [x] Validate ONNX/narrative asset names match code usage (latin_solver optional fallback).
+6. [x] Confirm Classik story gating shows stub (no crash).
 
 ## Emulator and Instrumented Tests
 7. [x] Headless emulator boot script.
