@@ -9,6 +9,7 @@ package org.yegie.keenkenning.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import kotlin.math.max
 import kotlin.math.min
 
@@ -146,18 +147,12 @@ class UserStatsManager(context: Context) {
         undoCount: Int = 0,
         modeName: String? = null
     ) {
-        val editor = prefs.edit()
-
         // Update global stats
         val newTotal = prefs.getInt(KEY_TOTAL_SOLVED, 0) + 1
         val oldAvg = prefs.getLong(KEY_AVG_TIME, 0)
         val newAvg = if (newTotal == 1) solveTimeSeconds
                      else (oldAvg * (newTotal - 1) + solveTimeSeconds) / newTotal
         val newHints = prefs.getInt(KEY_TOTAL_HINTS, 0) + hintsUsed
-
-        editor.putInt(KEY_TOTAL_SOLVED, newTotal)
-        editor.putLong(KEY_AVG_TIME, newAvg)
-        editor.putInt(KEY_TOTAL_HINTS, newHints)
 
         // Update per-size stats
         val key = "$KEY_SIZE_STATS_PREFIX$gridSize"
@@ -167,15 +162,9 @@ class UserStatsManager(context: Context) {
                          else (sizeOldAvg * (sizeCount - 1) + solveTimeSeconds) / sizeCount
         val sizeBest = min(prefs.getLong("${key}_best", Long.MAX_VALUE), solveTimeSeconds)
 
-        editor.putInt("${key}_count", sizeCount)
-        editor.putLong("${key}_avg", sizeNewAvg)
-        editor.putLong("${key}_best", sizeBest)
-
         // Update win streak
         val currentStreak = prefs.getInt(KEY_CURRENT_STREAK, 0) + 1
         val bestStreak = max(prefs.getInt(KEY_BEST_STREAK, 0), currentStreak)
-        editor.putInt(KEY_CURRENT_STREAK, currentStreak)
-        editor.putInt(KEY_BEST_STREAK, bestStreak)
 
         // Update error rate (exponential moving average)
         val cellCount = gridSize * gridSize
@@ -183,53 +172,64 @@ class UserStatsManager(context: Context) {
         val oldErrorRate = prefs.getFloat(KEY_AVG_ERROR_RATE, 0f)
         val newErrorRate = if (newTotal == 1) errorRate
                            else oldErrorRate * 0.8f + errorRate * 0.2f
-        editor.putFloat(KEY_AVG_ERROR_RATE, newErrorRate)
 
         // Update undo rate (exponential moving average)
         val undoRate = undoCount.toFloat() / cellCount
         val oldUndoRate = prefs.getFloat(KEY_AVG_UNDO_RATE, 0f)
         val newUndoRate = if (newTotal == 1) undoRate
                           else oldUndoRate * 0.8f + undoRate * 0.2f
-        editor.putFloat(KEY_AVG_UNDO_RATE, newUndoRate)
 
         // Update mode diversity
-        modeName?.let { mode ->
+        val recentModes = modeName?.let { mode ->
             val recentModesStr = prefs.getString(KEY_RECENT_MODES, "") ?: ""
             val recentModes = if (recentModesStr.isBlank()) mutableListOf()
                               else recentModesStr.split(",").toMutableList()
             recentModes.add(0, mode)
             // Keep only the most recent modes
             val trimmed = recentModes.take(MAX_RECENT_MODES)
-            editor.putString(KEY_RECENT_MODES, trimmed.joinToString(","))
+            trimmed.joinToString(",")
         }
 
         // Update last played timestamp
-        editor.putLong(KEY_LAST_PLAYED, System.currentTimeMillis())
+        val lastPlayed = System.currentTimeMillis()
 
         // Recompute skill score with enhanced factors
         val skillScore = computeSkillScore(gridSize, solveTimeSeconds, hintsUsed, difficulty, errorCount, undoCount)
         val oldSkill = prefs.getFloat(KEY_SKILL_SCORE, 0.5f)
         // Exponential moving average: 20% new, 80% old for stability
         val newSkill = oldSkill * 0.8f + skillScore * 0.2f
-        editor.putFloat(KEY_SKILL_SCORE, newSkill.coerceIn(0.1f, 0.95f))
 
-        editor.apply()
+        prefs.edit {
+            putInt(KEY_TOTAL_SOLVED, newTotal)
+            putLong(KEY_AVG_TIME, newAvg)
+            putInt(KEY_TOTAL_HINTS, newHints)
+            putInt("${key}_count", sizeCount)
+            putLong("${key}_avg", sizeNewAvg)
+            putLong("${key}_best", sizeBest)
+            putInt(KEY_CURRENT_STREAK, currentStreak)
+            putInt(KEY_BEST_STREAK, bestStreak)
+            putFloat(KEY_AVG_ERROR_RATE, newErrorRate)
+            putFloat(KEY_AVG_UNDO_RATE, newUndoRate)
+            recentModes?.let { putString(KEY_RECENT_MODES, it) }
+            putLong(KEY_LAST_PLAYED, lastPlayed)
+            putFloat(KEY_SKILL_SCORE, newSkill.coerceIn(0.1f, 0.95f))
+        }
     }
 
     fun recordPuzzleAbandoned() {
-        prefs.edit()
-            .putInt(KEY_TOTAL_ABANDONED, prefs.getInt(KEY_TOTAL_ABANDONED, 0) + 1)
-            .putInt(KEY_CURRENT_STREAK, 0)  // Reset streak on abandon
-            .apply()
+        prefs.edit {
+            putInt(KEY_TOTAL_ABANDONED, prefs.getInt(KEY_TOTAL_ABANDONED, 0) + 1)
+            putInt(KEY_CURRENT_STREAK, 0)  // Reset streak on abandon
+        }
     }
 
     /**
      * Record the start of a new session (app opened).
      */
     fun recordSessionStart() {
-        prefs.edit()
-            .putInt(KEY_TOTAL_SESSIONS, prefs.getInt(KEY_TOTAL_SESSIONS, 0) + 1)
-            .apply()
+        prefs.edit {
+            putInt(KEY_TOTAL_SESSIONS, prefs.getInt(KEY_TOTAL_SESSIONS, 0) + 1)
+        }
     }
 
     /**
@@ -384,6 +384,6 @@ class UserStatsManager(context: Context) {
     }
 
     fun clearStats() {
-        prefs.edit().clear().apply()
+        prefs.edit { clear() }
     }
 }

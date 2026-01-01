@@ -12,6 +12,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.*
+import androidx.core.content.edit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.yegie.keenkenning.data.GameMode
@@ -119,7 +120,7 @@ class MenuActivity : AppCompatActivity() {
                         multiplicationOnly = mode == GameMode.MULTIPLICATION_ONLY
                     )
                     // Persist mode selection
-                    prefs.edit().putString(MENU_MODE, mode.name).apply()
+                    prefs.edit { putString(MENU_MODE, mode.name) }
                     // Update legacy flag for compatibility
                     app.gameMult = if (mode == GameMode.MULTIPLICATION_ONLY) 1 else 0
                 },

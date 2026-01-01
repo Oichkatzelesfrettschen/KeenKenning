@@ -21,6 +21,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.core.content.edit
 import com.google.gson.Gson
 import org.yegie.keenkenning.data.GameMode
 import org.yegie.keenkenning.ui.GameScreen
@@ -165,28 +166,25 @@ class KeenActivity : AppCompatActivity() {
     override fun onPause() {
         // Pause the timer before saving
         viewModel.pauseTimer()
-
-        val editor = sharedPref.edit()
-        val currentModel = gameModel
-
-        if (currentModel != null) {
-            val modelAsString = Gson().toJson(currentModel, KeenModel::class.java)
-            editor.putString(SAVE_MODEL, modelAsString)
-            // Save timer state for this game mode
-            val elapsedTime = viewModel.getElapsedTimeForSave()
-            val currentGameMode = viewModel.getCurrentGameMode()
-            editor.putLong(SAVE_ELAPSED_TIME, elapsedTime)
-            editor.putString(SAVE_GAME_MODE, currentGameMode.name)
-            (application as ApplicationCore).setCanCont(!currentModel.puzzleWon)
-            Log.d("KEEN", "onPause: saved timer=$elapsedTime, mode=${currentGameMode.name}")
-        } else {
-            editor.putString(SAVE_MODEL, "")
-            editor.putLong(SAVE_ELAPSED_TIME, 0L)
-            editor.putString(SAVE_GAME_MODE, GameMode.STANDARD.name)
-            (application as ApplicationCore).setCanCont(false)
+        sharedPref.edit {
+            val currentModel = gameModel
+            if (currentModel != null) {
+                val modelAsString = Gson().toJson(currentModel, KeenModel::class.java)
+                putString(SAVE_MODEL, modelAsString)
+                // Save timer state for this game mode
+                val elapsedTime = viewModel.getElapsedTimeForSave()
+                val currentGameMode = viewModel.getCurrentGameMode()
+                putLong(SAVE_ELAPSED_TIME, elapsedTime)
+                putString(SAVE_GAME_MODE, currentGameMode.name)
+                (application as ApplicationCore).setCanCont(!currentModel.puzzleWon)
+                Log.d("KEEN", "onPause: saved timer=$elapsedTime, mode=${currentGameMode.name}")
+            } else {
+                putString(SAVE_MODEL, "")
+                putLong(SAVE_ELAPSED_TIME, 0L)
+                putString(SAVE_GAME_MODE, GameMode.STANDARD.name)
+                (application as ApplicationCore).setCanCont(false)
+            }
         }
-
-        editor.apply()
         super.onPause()
     }
 

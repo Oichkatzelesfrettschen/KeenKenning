@@ -9,6 +9,7 @@ package org.yegie.keenkenning.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import com.google.gson.Gson
 import org.yegie.keenkenning.KeenModel
 
@@ -113,14 +114,14 @@ class SaveManager(context: Context) {
 
         try {
             val modelJson = gson.toJson(model, KeenModel::class.java)
-            prefs.edit()
-                .putString("$KEY_MODEL_PREFIX$slotIndex", modelJson)
-                .putInt("$KEY_SIZE_PREFIX$slotIndex", model.size)
-                .putString("$KEY_DIFF_PREFIX$slotIndex", difficultyName)
-                .putLong("$KEY_TIME_PREFIX$slotIndex", System.currentTimeMillis())
-                .putLong("$KEY_ELAPSED_PREFIX$slotIndex", elapsedSeconds)
-                .putBoolean("$KEY_SOLVED_PREFIX$slotIndex", model.puzzleWon)
-                .apply()
+            prefs.edit {
+                putString("$KEY_MODEL_PREFIX$slotIndex", modelJson)
+                putInt("$KEY_SIZE_PREFIX$slotIndex", model.size)
+                putString("$KEY_DIFF_PREFIX$slotIndex", difficultyName)
+                putLong("$KEY_TIME_PREFIX$slotIndex", System.currentTimeMillis())
+                putLong("$KEY_ELAPSED_PREFIX$slotIndex", elapsedSeconds)
+                putBoolean("$KEY_SOLVED_PREFIX$slotIndex", model.puzzleWon)
+            }
             return true
         } catch (e: Exception) {
             e.printStackTrace()
@@ -158,12 +159,12 @@ class SaveManager(context: Context) {
     ) {
         try {
             val modelJson = gson.toJson(model, KeenModel::class.java)
-            prefs.edit()
-                .putString(KEY_AUTOSAVE_MODEL, modelJson)
-                .putString(KEY_AUTOSAVE_DIFF_NAME, difficultyName)
-                .putLong(KEY_AUTOSAVE_TIMESTAMP, System.currentTimeMillis())
-                .putLong(KEY_AUTOSAVE_ELAPSED, elapsedSeconds)
-                .apply()
+            prefs.edit {
+                putString(KEY_AUTOSAVE_MODEL, modelJson)
+                putString(KEY_AUTOSAVE_DIFF_NAME, difficultyName)
+                putLong(KEY_AUTOSAVE_TIMESTAMP, System.currentTimeMillis())
+                putLong(KEY_AUTOSAVE_ELAPSED, elapsedSeconds)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -200,14 +201,14 @@ class SaveManager(context: Context) {
     fun deleteSlot(slotIndex: Int): Boolean {
         if (slotIndex < 0 || slotIndex >= MAX_SLOTS) return false
 
-        prefs.edit()
-            .remove("$KEY_MODEL_PREFIX$slotIndex")
-            .remove("$KEY_SIZE_PREFIX$slotIndex")
-            .remove("$KEY_DIFF_PREFIX$slotIndex")
-            .remove("$KEY_TIME_PREFIX$slotIndex")
-            .remove("$KEY_ELAPSED_PREFIX$slotIndex")
-            .remove("$KEY_SOLVED_PREFIX$slotIndex")
-            .apply()
+        prefs.edit {
+            remove("$KEY_MODEL_PREFIX$slotIndex")
+            remove("$KEY_SIZE_PREFIX$slotIndex")
+            remove("$KEY_DIFF_PREFIX$slotIndex")
+            remove("$KEY_TIME_PREFIX$slotIndex")
+            remove("$KEY_ELAPSED_PREFIX$slotIndex")
+            remove("$KEY_SOLVED_PREFIX$slotIndex")
+        }
         return true
     }
 

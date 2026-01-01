@@ -52,9 +52,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -163,25 +163,21 @@ fun GameScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val haptic = LocalHapticFeedback.current
-    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
 
     // Focus requester for keyboard input
     val focusRequester = remember { FocusRequester() }
 
-    // Determine if we're on a large screen (tablet)
-    val isLargeScreen = configuration.screenWidthDp > 600
-
     // Detect Android TV for enhanced D-pad navigation visuals
     val isTv = isAndroidTv()
 
-    // Calculate responsive dimensions
-    val screenWidth = configuration.screenWidthDp.dp
-    val screenHeight = configuration.screenHeightDp.dp
-
-    // Convert to pixels for victory animation
-    val screenWidthPx = with(density) { screenWidth.toPx() }
-    val screenHeightPx = with(density) { screenHeight.toPx() }
+    // Calculate responsive dimensions from the real container size
+    val screenWidthPx = windowInfo.containerSize.width.toFloat()
+    val screenHeightPx = windowInfo.containerSize.height.toFloat()
+    val screenWidth = with(density) { screenWidthPx.toDp() }
+    val screenHeight = with(density) { screenHeightPx.toDp() }
+    val isLargeScreen = screenWidth > 600.dp
 
     // Request focus on launch for keyboard input
     LaunchedEffect(Unit) {

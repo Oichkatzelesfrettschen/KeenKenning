@@ -11,15 +11,15 @@ import androidx.tracing.Trace
 
 object PerfTrace {
     inline fun <T> section(name: String, block: () -> T): T {
-        val enabled = runCatching { Trace.isEnabled() }.getOrDefault(false)
-        if (!enabled) {
-            return block()
-        }
-        runCatching { Trace.beginSection(name) }
-        return try {
+        return if (Trace.isEnabled()) {
+            Trace.beginSection(name)
+            try {
+                block()
+            } finally {
+                Trace.endSection()
+            }
+        } else {
             block()
-        } finally {
-            runCatching { Trace.endSection() }
         }
     }
 }

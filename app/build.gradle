@@ -156,7 +156,7 @@ android {
         warningsAsErrors = true
         abortOnError = true
         checkReleaseBuilds = true
-        disable 'GradleDependency'
+        disable 'GradleDependency', 'AndroidGradlePluginVersion'
     }
 
     externalNativeBuild {
@@ -201,6 +201,7 @@ dependencies {
     }
 
     implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
     implementation 'com.google.code.gson:gson:2.10.1'
