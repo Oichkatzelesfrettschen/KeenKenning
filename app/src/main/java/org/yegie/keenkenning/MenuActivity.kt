@@ -51,21 +51,22 @@ class MenuActivity : AppCompatActivity() {
             val prefs = getSharedPreferences(packageName + "_preferences", MODE_PRIVATE)
             val lifecycleOwner = LocalLifecycleOwner.current
 
-            // Load saved game mode, default to STANDARD
+            val availableModes = GameMode.availableModes()
             val savedModeName = prefs.getString(MENU_MODE, GameMode.STANDARD.name)
             val savedMode = try {
                 GameMode.valueOf(savedModeName ?: GameMode.STANDARD.name)
             } catch (e: IllegalArgumentException) {
                 GameMode.STANDARD
             }
+            val initialMode = if (savedMode in availableModes) savedMode else GameMode.DEFAULT
 
             var menuState by remember {
                 mutableStateOf(
                     MenuState(
                         selectedSize = app.gameSize.coerceIn(3, 16),
                         selectedDifficulty = app.gameDiff,
-                        selectedMode = savedMode,
-                        multiplicationOnly = savedMode == GameMode.MULTIPLICATION_ONLY,
+                        selectedMode = initialMode,
+                        multiplicationOnly = initialMode == GameMode.MULTIPLICATION_ONLY,
                         canContinue = app.isCanCont
                     )
                 )
@@ -82,11 +83,16 @@ class MenuActivity : AppCompatActivity() {
                         } catch (e: IllegalArgumentException) {
                             GameMode.STANDARD
                         }
+                        val clampedMode = if (currentMode in availableModes) {
+                            currentMode
+                        } else {
+                            GameMode.DEFAULT
+                        }
                         menuState = menuState.copy(
                             selectedSize = app.gameSize.coerceIn(3, 16),
                             selectedDifficulty = app.gameDiff,
-                            selectedMode = currentMode,
-                            multiplicationOnly = currentMode == GameMode.MULTIPLICATION_ONLY,
+                            selectedMode = clampedMode,
+                            multiplicationOnly = clampedMode == GameMode.MULTIPLICATION_ONLY,
                             canContinue = app.isCanCont
                         )
                     }

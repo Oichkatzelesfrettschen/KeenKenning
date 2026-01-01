@@ -33,7 +33,7 @@ typedef struct {
     int w;          /* Grid width/height */
     digit* grid;    /* Current cell values (0 = empty) */
     int* dsf;       /* Disjoint set forest for cage membership */
-    long* clues;    /* Cage clues with operation encoded in upper bits */
+    clue_t* clues;    /* Cage clues with operation encoded in upper bits */
     int mode_flags; /* Mode flags for special rules (e.g., MODE_KILLER) */
 } validate_ctx;
 

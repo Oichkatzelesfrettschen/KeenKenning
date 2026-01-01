@@ -10,6 +10,13 @@ Total codebase: **11,743 LOC** across 6 languages
 - XML: ~200 LOC (13 files)
 - Shell: ~100 LOC (4 files)
 
+## Current Decisions (2025-12)
+- Flavor topology: Classik baseline in app/src/main; Kenning overrides in app/src/kenning.
+- Modules: :core for shared logic, :kenning for ML/narrative; assets in kenning/src/main/assets.
+- Perf tooling: scripts/perf + host CTest; Gradle properties for sanitizers/PGO.
+- Build tooling: AGP 8.13.2, Kotlin 2.3.0 (Compose plugin 2.3.0), Gradle 8.13, Compose BOM 2025.12.01.
+- Native toolchain: C23/C++23 with warnings-as-errors, LTO/PGO/BOLT toggles, clang + lld defaults.
+
 ## Phase 1: Dead Code Removal (Est. -400 LOC)
 
 ### 1.1 Java/Kotlin Cleanup

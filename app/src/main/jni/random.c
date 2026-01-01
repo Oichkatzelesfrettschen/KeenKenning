@@ -58,7 +58,7 @@ static void SHA_Core_Init(uint32 h[5]) {
 }
 
 static void SHATransform(uint32* digest, uint32* block) {
-    uint32 w[80];
+    uint32 w[80] = {0};
     uint32 a, b, c, d, e;
     int t;
 
@@ -307,7 +307,7 @@ char* random_state_encode(random_state* state) {
         len += sprintf(retbuf + len, "%02X", state->seedbuf[i]);
     for (i = 0; i < (int)lenof(state->databuf); i++)
         len += sprintf(retbuf + len, "%02X", state->databuf[i]);
-    len += sprintf(retbuf + len, "%02x", state->pos);
+    sprintf(retbuf + len, "%02x", state->pos);
 
     return dupstr(retbuf);
 }

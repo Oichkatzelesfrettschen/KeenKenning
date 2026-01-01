@@ -16,6 +16,7 @@ package org.yegie.keenkenning.ui
 
 import org.yegie.keenkenning.KeenModel
 import org.yegie.keenkenning.data.GameMode
+import org.yegie.keenkenning.perf.PerfTrace
 
 /**
  * Platform-agnostic representation of game state for rendering.
@@ -178,25 +179,27 @@ object GameStateTransformer {
         elapsedSeconds: Long = 0,
         difficulty: Int = 0
     ): RenderableGameState {
-        val size = model.size
-        val zones = transformZones(model, gameMode)
-        val cells = transformCells(model, size)
-        val selectedCell = if (model.hasActiveCords()) {
-            CellCoord(model.activeX.toInt(), model.activeY.toInt())
-        } else null
+        return PerfTrace.section("GameStateTransformer.transform") {
+            val size = model.size
+            val zones = transformZones(model, gameMode)
+            val cells = transformCells(model, size)
+            val selectedCell = if (model.hasActiveCords()) {
+                CellCoord(model.activeX.toInt(), model.activeY.toInt())
+            } else null
 
-        return RenderableGameState(
-            size = size,
-            cells = cells,
-            zones = zones,
-            selectedCell = selectedCell,
-            isSolved = model.puzzleWon,
-            isNotesMode = isNotesMode,
-            gameMode = gameMode,
-            isMlGenerated = model.wasMlGenerated(),
-            elapsedSeconds = elapsedSeconds,
-            difficulty = difficulty
-        )
+            RenderableGameState(
+                size = size,
+                cells = cells,
+                zones = zones,
+                selectedCell = selectedCell,
+                isSolved = model.puzzleWon,
+                isNotesMode = isNotesMode,
+                gameMode = gameMode,
+                isMlGenerated = model.wasMlGenerated(),
+                elapsedSeconds = elapsedSeconds,
+                difficulty = difficulty
+            )
+        }
     }
 
     private fun transformZones(model: KeenModel, gameMode: GameMode): List<RenderableZone> {

@@ -15,6 +15,7 @@ import android.content.Context
 import android.util.Log
 import org.yegie.keenkenning.data.GameMode
 import org.yegie.keenkenning.data.PuzzleGenerationResult
+import org.yegie.keenkenning.perf.PerfTrace
 
 /**
  * Configuration for puzzle generation.
@@ -81,59 +82,61 @@ class PuzzleGenerator {
      * @return PuzzleGenerationResult.Success or specific Failure variant
      */
     fun generate(context: Context, config: GenerationConfig): PuzzleGenerationResult {
-        val startTime = System.currentTimeMillis()
+        return PerfTrace.section("PuzzleGenerator.generate") {
+            val startTime = System.currentTimeMillis()
 
-        // Validate parameters
-        if (config.size !in 3..16) {
-            return PuzzleGenerationResult.Failure.InvalidParameters(
-                message = "Grid size must be between 3 and 16",
-                paramName = "size",
-                providedValue = config.size
-            )
-        }
-
-        return try {
-            val model = legacyBuilder.build(
-                context,
-                config.size,
-                config.difficulty,
-                config.multiplicationOnly,
-                config.seed,
-                config.useAI,
-                config.modeFlags
-            )
-
-            if (model != null) {
-                val elapsed = System.currentTimeMillis() - startTime
-                Log.d("PuzzleGenerator", "Generated ${config.size}x${config.size} puzzle in ${elapsed}ms")
-
-                PuzzleGenerationResult.Success(
-                    model = model,
-                    wasMlGenerated = model.wasMlGenerated(),
-                    generationTimeMs = elapsed
-                )
-            } else {
-                PuzzleGenerationResult.Failure.NativeGenerationFailed(
-                    message = "KeenModelBuilder returned null"
+            // Validate parameters
+            if (config.size !in 3..16) {
+                return@section PuzzleGenerationResult.Failure.InvalidParameters(
+                    message = "Grid size must be between 3 and 16",
+                    paramName = "size",
+                    providedValue = config.size
                 )
             }
-        } catch (e: NumberFormatException) {
-            Log.e("PuzzleGenerator", "Parsing error: ${e.message}")
-            PuzzleGenerationResult.Failure.ParsingFailed(
-                message = "Failed to parse JNI payload: ${e.message}",
-                rawPayload = null // Don't expose raw data in errors
-            )
-        } catch (e: StringIndexOutOfBoundsException) {
-            Log.e("PuzzleGenerator", "Payload truncation: ${e.message}")
-            PuzzleGenerationResult.Failure.ParsingFailed(
-                message = "JNI payload was truncated or malformed",
-                rawPayload = null
-            )
-        } catch (e: Exception) {
-            Log.e("PuzzleGenerator", "Unexpected error: ${e.message}", e)
-            PuzzleGenerationResult.Failure.NativeGenerationFailed(
-                message = "Unexpected error during generation: ${e.message}"
-            )
+
+            try {
+                val model = legacyBuilder.build(
+                    context,
+                    config.size,
+                    config.difficulty,
+                    config.multiplicationOnly,
+                    config.seed,
+                    config.useAI,
+                    config.modeFlags
+                )
+
+                if (model != null) {
+                    val elapsed = System.currentTimeMillis() - startTime
+                    Log.d("PuzzleGenerator", "Generated ${config.size}x${config.size} puzzle in ${elapsed}ms")
+
+                    PuzzleGenerationResult.Success(
+                        model = model,
+                        wasMlGenerated = model.wasMlGenerated(),
+                        generationTimeMs = elapsed
+                    )
+                } else {
+                    PuzzleGenerationResult.Failure.NativeGenerationFailed(
+                        message = "KeenModelBuilder returned null"
+                    )
+                }
+            } catch (e: NumberFormatException) {
+                Log.e("PuzzleGenerator", "Parsing error: ${e.message}")
+                PuzzleGenerationResult.Failure.ParsingFailed(
+                    message = "Failed to parse JNI payload: ${e.message}",
+                    rawPayload = null // Don't expose raw data in errors
+                )
+            } catch (e: StringIndexOutOfBoundsException) {
+                Log.e("PuzzleGenerator", "Payload truncation: ${e.message}")
+                PuzzleGenerationResult.Failure.ParsingFailed(
+                    message = "JNI payload was truncated or malformed",
+                    rawPayload = null
+                )
+            } catch (e: Exception) {
+                Log.e("PuzzleGenerator", "Unexpected error: ${e.message}", e)
+                PuzzleGenerationResult.Failure.NativeGenerationFailed(
+                    message = "Unexpected error during generation: ${e.message}"
+                )
+            }
         }
     }
 

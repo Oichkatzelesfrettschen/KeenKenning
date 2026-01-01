@@ -117,7 +117,7 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
 
     /* The seed is used as a set of bytes, so passing the content
      * of the memory occupied by the jlong we have. */
-    long lseed = seed;
+    long lseed = (long)seed;
     struct random_state* rs = random_new((char*)&lseed, sizeof(long));
 
     char* aux = nullptr;
@@ -201,7 +201,7 @@ JNIEXPORT jstring JNICALL Java_org_yegie_keenkenning_KeenModelBuilder_getLevelFr
     params.multiplication_only = multOnly;
     params.mode_flags = modeFlags;
 
-    long lseed = seed;
+    long lseed = (long)seed;
     struct random_state* rs = random_new((char*)&lseed, sizeof(long));
 
     /* Convert Java int array to C digit array */
@@ -365,13 +365,13 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenValidator_validateGri
     /* Convert to native types */
     digit* grid = snewn((size_t)n, digit);
     int* dsf = snewn((size_t)n, int);
-    long* clues = snewn((size_t)n, long);
+    clue_t* clues = snewn((size_t)n, clue_t);
     int* errors = snewn((size_t)n, int);
 
     for (int i = 0; i < n; i++) {
         grid[i] = (digit)grid_body[i];
         dsf[i] = dsf_body[i];
-        clues[i] = (long)clues_body[i];
+        clues[i] = (clue_t)clues_body[i];
     }
 
     /* Release Java arrays */
@@ -430,12 +430,12 @@ JNIEXPORT jint JNICALL Java_org_yegie_keenkenning_KeenValidator_isComplete(
 
     digit* grid = snewn((size_t)n, digit);
     int* dsf = snewn((size_t)n, int);
-    long* clues = snewn((size_t)n, long);
+    clue_t* clues = snewn((size_t)n, clue_t);
 
     for (int i = 0; i < n; i++) {
         grid[i] = (digit)grid_body[i];
         dsf[i] = dsf_body[i];
-        clues[i] = (long)clues_body[i];
+        clues[i] = (clue_t)clues_body[i];
     }
 
     (*env)->ReleaseIntArrayElements(env, gridFlat, grid_body, 0);
@@ -498,13 +498,13 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_getNextHint(
 
     digit* grid = snewn((size_t)n, digit);
     int* dsf = snewn((size_t)n, int);
-    long* clues = snewn((size_t)n, long);
+    clue_t* clues = snewn((size_t)n, clue_t);
     digit* solution = solutionFlat ? snewn((size_t)n, digit) : nullptr;
 
     for (int i = 0; i < n; i++) {
         grid[i] = (digit)grid_body[i];
         dsf[i] = dsf_body[i];
-        clues[i] = (long)clues_body[i];
+        clues[i] = (clue_t)clues_body[i];
         if (solution) solution[i] = (digit)solution_body[i];
     }
 
@@ -566,13 +566,13 @@ JNIEXPORT jintArray JNICALL Java_org_yegie_keenkenning_KeenHints_explainCell(
 
     digit* grid = snewn((size_t)n, digit);
     int* dsf = snewn((size_t)n, int);
-    long* clues = snewn((size_t)n, long);
+    clue_t* clues = snewn((size_t)n, clue_t);
     digit* solution = solutionFlat ? snewn((size_t)n, digit) : nullptr;
 
     for (int i = 0; i < n; i++) {
         grid[i] = (digit)grid_body[i];
         dsf[i] = dsf_body[i];
-        clues[i] = (long)clues_body[i];
+        clues[i] = (clue_t)clues_body[i];
         if (solution) solution[i] = (digit)solution_body[i];
     }
 

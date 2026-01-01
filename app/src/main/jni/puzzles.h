@@ -39,8 +39,17 @@
 #define PUZZLES_PUZZLES_H
 
 #include <limits.h> /* for UINT_MAX */
+#include <stdint.h> /* for uint64_t */
 #include <stdio.h>  /* for FILE */
 #include <stdlib.h> /* for size_t */
+
+#ifndef __cplusplus
+#ifndef nullptr
+#define nullptr NULL
+#endif
+#endif
+
+typedef uint64_t clue_t;
 
 #define PI 3.141592653589793238462643383279502884197169399
 

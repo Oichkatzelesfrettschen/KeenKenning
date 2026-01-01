@@ -9,8 +9,37 @@ JAVA_HOME_TARGET := /usr/lib/jvm/java-21-openjdk
 GRADLE := export JAVA_HOME=$(JAVA_HOME_TARGET) && ./gradlew
 
 # Host Toolchain
-CC = gcc
-CFLAGS = -O3 -march=native -flto -ffast-math -funroll-loops -Iapp/src/main/jni -DSTANDALONE_LATIN_TEST -Wall -Wextra -Werror
+C_STD ?= c23
+CC := clang
+PGO_MODE ?= generate
+PGO_PROFILE ?=
+BOLT_RELOCS ?= 1
+VECTOR_FLAGS ?= -fvectorize -fslp-vectorize -fno-math-errno
+CFLAGS ?= -O3 -std=$(C_STD) -march=native -flto -ffast-math -funroll-loops $(VECTOR_FLAGS) -Iapp/src/main/jni -DSTANDALONE_LATIN_TEST -Wall -Wextra -Werror
+LDFLAGS ?=
+
+ifeq ($(findstring clang,$(CC)),)
+$(error CC must be clang for mandatory perf toolchain)
+endif
+
+ifneq ($(PGO_MODE),)
+  ifeq ($(PGO_MODE),generate)
+    CFLAGS += -fprofile-instr-generate
+    LDFLAGS += -fprofile-instr-generate
+  else ifeq ($(PGO_MODE),use)
+    ifeq ($(PGO_PROFILE),)
+      $(error PGO_PROFILE is required when PGO_MODE=use)
+    endif
+    CFLAGS += -fprofile-instr-use=$(PGO_PROFILE)
+    LDFLAGS += -fprofile-instr-use=$(PGO_PROFILE)
+  else ifneq ($(PGO_MODE),off)
+    $(error Unknown PGO_MODE=$(PGO_MODE); use generate|use|off)
+  endif
+endif
+
+ifeq ($(BOLT_RELOCS),1)
+  LDFLAGS += -Wl,--emit-relocs
+endif
 SIMD_FLAGS = -mavx2 -msse2
 JNI_DIR = app/src/main/jni
 AI_DIR = scripts/ai
@@ -23,7 +52,8 @@ SOURCES = $(JNI_DIR)/latin.c \
 
 # --- Main Targets ---
 
-.PHONY: help all build release install clean test lint format tools check-env
+.PHONY: help all build release install clean test lint format tools check-env android-test android-bench
+.PHONY: perf-host-build perf-host perf-flamegraph perf-coverage perf-valgrind perf-infer perf-pgo perf-bolt perf-ctest
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -52,6 +82,12 @@ clean: ## Remove build artifacts
 test: ## Run local unit tests
 	$(GRADLE) testDebugUnitTest
 
+android-test: ## Run connected Kenning UI tests with emulator keepalive/logcat capture
+	./scripts/run_android_tests.sh --ui --task=connectedKenningDebugAndroidTest
+
+android-bench: ## Run connected Kenning benchmarks with AndroidBenchmarkRunner
+	./scripts/run_android_tests.sh --bench --task=connectedKenningDebugAndroidTest
+
 lint: ## Run Android Lint
 	$(GRADLE) lintDebug
 
@@ -63,7 +99,7 @@ format: ## Apply formatting (Placeholder)
 tools: latin_gen_opt ## Build host-side C tools for AI training
 
 latin_gen_opt: $(SOURCES)
-	$(CC) $(CFLAGS) $(SIMD_FLAGS) -o $(AI_DIR)/latin_gen_opt $(SOURCES)
+	$(CC) $(CFLAGS) $(SIMD_FLAGS) -o $(AI_DIR)/latin_gen_opt $(SOURCES) $(LDFLAGS)
 
 # --- AI Training Pipeline ---
 
@@ -156,3 +192,32 @@ run-kenning: install ## Run the app (Kenning flavor - ML enabled)
 
 run-classik: install ## Run the app (Classik flavor - no ML)
 	adb shell am start -n org.yegie.keenkenning.classik/.KeenActivity
+
+# --- Host Performance Tooling ---
+
+perf-host-build: ## Build host tool with perf-friendly flags
+	./scripts/perf/host_build.sh --mode=perf
+
+perf-host: ## Record perf data for host Latin generator
+	./scripts/perf/host_perf_record.sh
+
+perf-flamegraph: ## Generate flamegraph from host perf data
+	./scripts/perf/host_flamegraph.sh
+
+perf-coverage: ## Generate gcovr coverage report from host tool
+	./scripts/perf/host_coverage.sh
+
+perf-valgrind: ## Run valgrind on host tool
+	./scripts/perf/host_valgrind.sh
+
+perf-infer: ## Run infer static analysis on host tool build
+	./scripts/perf/host_infer.sh
+
+perf-pgo: ## Run host PGO pipeline (clang + llvm-profdata)
+	./scripts/perf/host_pgo.sh
+
+perf-bolt: ## Run host BOLT pipeline (llvm-bolt + perf2bolt)
+	./scripts/perf/host_bolt.sh
+
+perf-ctest: ## Run host CMake + CTest smoke test
+	./scripts/perf/host_ctest.sh

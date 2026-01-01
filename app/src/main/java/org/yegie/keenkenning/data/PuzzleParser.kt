@@ -13,6 +13,7 @@
 package org.yegie.keenkenning.data
 
 import org.yegie.keenkenning.KeenModel
+import org.yegie.keenkenning.perf.PerfTrace
 
 /**
  * Parsed zone definition from JNI payload.
@@ -64,95 +65,97 @@ object PuzzleParser {
      * @return ParseResult with puzzle or error details
      */
     fun parse(payload: String, size: Int): ParseResult {
-        if (payload.isBlank()) {
-            return ParseResult.Failure("Empty payload")
-        }
+        return PerfTrace.section("PuzzleParser.parse") {
+            if (payload.isBlank()) {
+                return@section ParseResult.Failure("Empty payload")
+            }
 
-        // Split by semicolon: first part is zone indices, rest is zone defs + solution
-        val semicolonIndex = payload.indexOf(';')
-        if (semicolonIndex == -1) {
-            return ParseResult.Failure("Missing semicolon separator", 0)
-        }
+            // Split by semicolon: first part is zone indices, rest is zone defs + solution
+            val semicolonIndex = payload.indexOf(';')
+            if (semicolonIndex == -1) {
+                return@section ParseResult.Failure("Missing semicolon separator", 0)
+            }
 
-        val zoneIndicesRaw = payload.substring(0, semicolonIndex)
-        val remainder = payload.substring(semicolonIndex + 1)
+            val zoneIndicesRaw = payload.substring(0, semicolonIndex)
+            val remainder = payload.substring(semicolonIndex + 1)
 
-        // Parse zone indices (2-digit numbers separated by commas or directly concatenated)
-        val zoneIndices = parseZoneIndices(zoneIndicesRaw, size)
-        if (zoneIndices.size != size * size) {
-            return ParseResult.Failure(
-                "Zone indices count mismatch: expected ${size * size}, got ${zoneIndices.size}",
-                0
+            // Parse zone indices (2-digit numbers separated by commas or directly concatenated)
+            val zoneIndices = parseZoneIndices(zoneIndicesRaw, size)
+            if (zoneIndices.size != size * size) {
+                return@section ParseResult.Failure(
+                    "Zone indices count mismatch: expected ${size * size}, got ${zoneIndices.size}",
+                    0
+                )
+            }
+
+            // Count unique zones
+            val uniqueZones = zoneIndices.toSet().size
+
+            // Parse zone definitions (7 chars each: operation char + 5-digit value)
+            val zoneDefs = mutableListOf<ParsedZone>()
+            var pos = 0
+            for (i in 0 until uniqueZones) {
+                if (pos + 6 > remainder.length) {
+                    return@section ParseResult.Failure("Truncated zone definition at zone $i", semicolonIndex + 1 + pos)
+                }
+
+                val opChar = remainder[pos]
+                val valueStr = remainder.substring(pos + 1, pos + 6)
+                val value = valueStr.toIntOrNull()
+                    ?: return@section ParseResult.Failure("Invalid zone value: $valueStr", semicolonIndex + 1 + pos + 1)
+
+                val operation = when (opChar) {
+                    'a' -> KeenModel.Zone.Type.ADD
+                    'm' -> KeenModel.Zone.Type.TIMES
+                    's' -> KeenModel.Zone.Type.MINUS
+                    'd' -> KeenModel.Zone.Type.DIVIDE
+                    'e' -> KeenModel.Zone.Type.EXPONENT
+                    'o' -> KeenModel.Zone.Type.MODULO    // 'o' for m'o'dulo
+                    'g' -> KeenModel.Zone.Type.GCD
+                    'l' -> KeenModel.Zone.Type.LCM
+                    'x' -> KeenModel.Zone.Type.XOR       // 'x' for XOR
+                    else -> return@section ParseResult.Failure("Unknown operation: $opChar", semicolonIndex + 1 + pos)
+                }
+
+                zoneDefs.add(ParsedZone(operation, value, i))
+                pos += 6
+                // Skip comma if present
+                if (pos < remainder.length && remainder[pos] == ',') {
+                    pos++
+                }
+            }
+
+            // Parse solution digits (remaining characters)
+            val solutionPart = remainder.substring(pos)
+            if (solutionPart.length < size * size) {
+                return@section ParseResult.Failure(
+                    "Solution digits count mismatch: expected ${size * size}, got ${solutionPart.length}",
+                    semicolonIndex + 1 + pos
+                )
+            }
+
+            // Build cells with zone mapping
+            val cells = mutableListOf<ParsedCell>()
+            val zoneMapping = buildZoneMapping(zoneIndices)
+
+            for (i in 0 until size * size) {
+                val digitChar = solutionPart[i]
+                val digit = digitChar.digitToIntOrNull()
+                    ?: return@section ParseResult.Failure("Invalid digit: $digitChar", semicolonIndex + 1 + pos + i)
+
+                val x = i / size
+                val y = i % size
+                val rawZoneId = zoneIndices[i]
+                val mappedZoneIndex = zoneMapping[rawZoneId]
+                    ?: return@section ParseResult.Failure("Unmapped zone: $rawZoneId", 0)
+
+                cells.add(ParsedCell(x, y, digit, mappedZoneIndex))
+            }
+
+            ParseResult.Success(
+                ParsedPuzzle(size, zoneDefs, cells)
             )
         }
-
-        // Count unique zones
-        val uniqueZones = zoneIndices.toSet().size
-
-        // Parse zone definitions (7 chars each: operation char + 5-digit value)
-        val zoneDefs = mutableListOf<ParsedZone>()
-        var pos = 0
-        for (i in 0 until uniqueZones) {
-            if (pos + 6 > remainder.length) {
-                return ParseResult.Failure("Truncated zone definition at zone $i", semicolonIndex + 1 + pos)
-            }
-
-            val opChar = remainder[pos]
-            val valueStr = remainder.substring(pos + 1, pos + 6)
-            val value = valueStr.toIntOrNull()
-                ?: return ParseResult.Failure("Invalid zone value: $valueStr", semicolonIndex + 1 + pos + 1)
-
-            val operation = when (opChar) {
-                'a' -> KeenModel.Zone.Type.ADD
-                'm' -> KeenModel.Zone.Type.TIMES
-                's' -> KeenModel.Zone.Type.MINUS
-                'd' -> KeenModel.Zone.Type.DIVIDE
-                'e' -> KeenModel.Zone.Type.EXPONENT
-                'o' -> KeenModel.Zone.Type.MODULO    // 'o' for m'o'dulo
-                'g' -> KeenModel.Zone.Type.GCD
-                'l' -> KeenModel.Zone.Type.LCM
-                'x' -> KeenModel.Zone.Type.XOR       // 'x' for XOR
-                else -> return ParseResult.Failure("Unknown operation: $opChar", semicolonIndex + 1 + pos)
-            }
-
-            zoneDefs.add(ParsedZone(operation, value, i))
-            pos += 6
-            // Skip comma if present
-            if (pos < remainder.length && remainder[pos] == ',') {
-                pos++
-            }
-        }
-
-        // Parse solution digits (remaining characters)
-        val solutionPart = remainder.substring(pos)
-        if (solutionPart.length < size * size) {
-            return ParseResult.Failure(
-                "Solution digits count mismatch: expected ${size * size}, got ${solutionPart.length}",
-                semicolonIndex + 1 + pos
-            )
-        }
-
-        // Build cells with zone mapping
-        val cells = mutableListOf<ParsedCell>()
-        val zoneMapping = buildZoneMapping(zoneIndices)
-
-        for (i in 0 until size * size) {
-            val digitChar = solutionPart[i]
-            val digit = digitChar.digitToIntOrNull()
-                ?: return ParseResult.Failure("Invalid digit: $digitChar", semicolonIndex + 1 + pos + i)
-
-            val x = i / size
-            val y = i % size
-            val rawZoneId = zoneIndices[i]
-            val mappedZoneIndex = zoneMapping[rawZoneId]
-                ?: return ParseResult.Failure("Unmapped zone: $rawZoneId", 0)
-
-            cells.add(ParsedCell(x, y, digit, mappedZoneIndex))
-        }
-
-        return ParseResult.Success(
-            ParsedPuzzle(size, zoneDefs, cells)
-        )
     }
 
     /**

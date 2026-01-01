@@ -9,7 +9,6 @@ package org.yegie.keenkenning.data
 
 import android.content.Context
 import org.yegie.keenkenning.KeenModel
-import org.yegie.keenkenning.NeuralKeenGenerator
 
 /**
  * Result of puzzle generation - either success with model or failure with error message.

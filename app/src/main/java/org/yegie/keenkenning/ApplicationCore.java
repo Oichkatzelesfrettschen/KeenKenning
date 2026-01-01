@@ -10,6 +10,8 @@ package org.yegie.keenkenning;
 import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
+import org.yegie.keenkenning.data.FlavorConfig;
+import org.yegie.keenkenning.data.FlavorConfigProvider;
 
 import static org.yegie.keenkenning.MenuActivity.DARK_MODE;
 import static org.yegie.keenkenning.MenuActivity.MENU_DIFF;
@@ -79,6 +81,23 @@ public class ApplicationCore extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+
+        FlavorConfigProvider.set(new FlavorConfig() {
+            @Override
+            public boolean getMlEnabled() {
+                return BuildConfig.ML_ENABLED;
+            }
+
+            @Override
+            public int getMinGridSize() {
+                return BuildConfig.MIN_GRID_SIZE;
+            }
+
+            @Override
+            public int getMaxGridSize() {
+                return BuildConfig.MAX_GRID_SIZE;
+            }
+        });
 
         sharedPref = getSharedPreferences(getPackageName() + "_preferences", Context.MODE_PRIVATE);
 

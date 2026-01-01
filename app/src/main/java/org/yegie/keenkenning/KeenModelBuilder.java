@@ -83,7 +83,7 @@ public class KeenModelBuilder {
         NeuralKeenGenerator.GenResult aiResult = null;
 
         if (useAI) {
-            NeuralKeenGenerator aiGen = new NeuralKeenGenerator();
+            NeuralKeenGenerator aiGen = FlavorServices.neuralGenerator();
             aiResult = aiGen.generate(context, size);
             if (aiResult != null && aiResult.grid != null) {
                 // Pass the AI grid to C to generate clues and validate
@@ -171,6 +171,12 @@ public class KeenModelBuilder {
         }
 
         levelAsString = levelAsString.substring(zoneCount*7);
+        if (levelAsString.startsWith(";")) {
+            levelAsString = levelAsString.substring(1);
+        }
+        if (levelAsString.startsWith("S")) {
+            levelAsString = levelAsString.substring(1);
+        }
 
         class zonePairing
         {

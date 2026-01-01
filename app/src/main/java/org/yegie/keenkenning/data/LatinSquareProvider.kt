@@ -12,6 +12,7 @@
 package org.yegie.keenkenning.data
 
 import android.content.Context
+import org.yegie.keenkenning.FlavorServices
 
 /**
  * Strategy interface for Latin square generation.
@@ -114,8 +115,7 @@ class OnnxLatinSquareProvider(private val context: Context) : LatinSquareProvide
         }
 
         return try {
-            val generator = org.yegie.keenkenning.NeuralKeenGenerator()
-            val result = generator.generate(context, size)
+            val result = FlavorServices.neuralGenerator().generate(context, size)
 
             if (result?.grid != null) {
                 LatinSquareResult.Success(

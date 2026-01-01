@@ -35,6 +35,8 @@
 #ifndef TREE234_H
 #define TREE234_H
 
+#include <stdbool.h>
+
 /*
  * This typedef is opaque outside tree234.c itself.
  */

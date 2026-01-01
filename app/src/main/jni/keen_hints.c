@@ -213,7 +213,7 @@ static int find_cage_single(const hint_ctx* ctx, hint_result* result) {
 
         if (cage_size == 1) {
             /* Single-cell cage - clue value IS the answer */
-            long clue = ctx->clues[root];
+            unsigned long clue = (unsigned long)(ctx->clues[root]);
             int value = (int)(clue & 0x1FFFFFFFL); /* Strip operation bits */
 
             if (value >= 1 && value <= w) {
@@ -274,7 +274,7 @@ int kenken_explain_cell(const hint_ctx* ctx, int cell, hint_result* result) {
     }
 
     if (cage_size == 1) {
-        long clue = ctx->clues[root];
+        unsigned long clue = (unsigned long)(ctx->clues[root]);
         int value = (int)(clue & 0x1FFFFFFFL);
         if (value >= 1 && value <= w) {
             result->hint_type = HINT_CAGE_SINGLE;

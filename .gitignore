@@ -1,5 +1,6 @@
 # Build artifacts
 /build
+**/build/
 /captures
 *.apk
 *.aab
@@ -39,8 +40,15 @@ scripts/ai/host_compat.o
 gha-creds-*.json
 
 # Logs and audit files
-logs/*.log
-logs/*.json
+logs/
+perf.data
+perf.data.old
+*.profraw
+*.profdata
+*gcov.json.gz
+
+# Core dumps
+core.*
 
 # Build/Environment
 .cxx/

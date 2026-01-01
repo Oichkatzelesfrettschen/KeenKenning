@@ -1,43 +1,85 @@
 plugins {
     id 'com.android.application'
     id 'kotlin-android'
+    id 'org.jetbrains.kotlin.plugin.compose'
+    id 'org.jlleitschuh.gradle.ktlint'
+    id 'io.gitlab.arturbosch.detekt'
 }
 
 android {
-    namespace 'org.yegie.keenkenning'
-    compileSdk 35
-    ndkVersion "27.2.12479018"
+    namespace = 'org.yegie.keenkenning'
+    compileSdk = 35
+    ndkVersion = "27.2.12479018"
+
+    def keenSanitizers = (project.findProperty("keenSanitizers") ?: "").toString().trim()
+    def keenCoverage = project.hasProperty("keenCoverage")
+    def keenFuncTrace = project.hasProperty("keenFuncTrace")
+    def keenLto = (project.findProperty("keenLto") ?: "true").toString().toBoolean()
+    def keenBoltRelocs = (project.findProperty("keenBoltRelocs") ?: "true").toString().toBoolean()
+    def keenPgo = (project.findProperty("keenPgo") ?: "generate").toString().trim()
+    def keenPgoProfile = (project.findProperty("keenPgoProfile") ?: "").toString().trim()
+    if (keenPgo == "off" || keenPgo == "none") {
+        keenPgo = ""
+    }
+
+    def defaultTestRunner = "androidx.test.runner.AndroidJUnitRunner"
+    def benchmarkTestRunner = "androidx.benchmark.junit4.AndroidBenchmarkRunner"
+    def benchmarkMode = project.hasProperty("keenBenchmark")
+    def requestedTestRunner = (project.findProperty("android.testInstrumentationRunner") ?: "").toString().trim()
+    def effectiveTestRunner = benchmarkMode ? benchmarkTestRunner : (requestedTestRunner ? requestedTestRunner : defaultTestRunner)
+    def useBenchmarkRunner = effectiveTestRunner == benchmarkTestRunner
+
+    def nativeWarnFlags = "-Werror -Wall -Wextra -Wshadow -Wconversion -Wformat=2 -Wimplicit-fallthrough"
+    def nativeSecurityFlags = "-fno-omit-frame-pointer -fstack-protector-strong"
+    def nativePerfFlags = "-O3 -fvectorize -fslp-vectorize -fno-math-errno"
+    def nativeCFlags = "-std=c23 ${nativeWarnFlags} ${nativeSecurityFlags} ${nativePerfFlags}"
+    def nativeCppFlags = "-std=c++23 ${nativeWarnFlags} ${nativeSecurityFlags} ${nativePerfFlags}"
+    def nativeDebugCFlags = "${nativeCFlags} -g3 -ggdb3 -fno-optimize-sibling-calls -fno-common"
+    def nativeDebugCppFlags = "${nativeCppFlags} -g3 -ggdb3 -fno-optimize-sibling-calls -fno-common"
+    def nativeCmakeArgs = [
+        "-DKEEN_SANITIZERS=${keenSanitizers}",
+        "-DKEEN_COVERAGE=${keenCoverage ? "ON" : "OFF"}",
+        "-DKEEN_FUNC_TRACE=${keenFuncTrace ? "ON" : "OFF"}",
+        "-DKEEN_LTO=${keenLto ? "ON" : "OFF"}",
+        "-DKEEN_BOLT_RELOCS=${keenBoltRelocs ? "ON" : "OFF"}",
+        "-DKEEN_PGO=${keenPgo}",
+        "-DKEEN_PGO_PROFILE=${keenPgoProfile}"
+    ]
 
     defaultConfig {
-        applicationId "org.yegie.keenkenning"
-        minSdk 22
-        targetSdk 35
-        versionCode 131
-        versionName "1.3.1"
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        applicationId = "org.yegie.keenkenning"
+        minSdk = 23
+        targetSdk = 35
+        versionCode = 131
+        versionName = "1.3.1"
+        testInstrumentationRunner = effectiveTestRunner
+        if (useBenchmarkRunner) {
+            testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "EMULATOR,DEBUGGABLE"
+        }
         vectorDrawables {
-            useSupportLibrary true
+            useSupportLibrary = true
         }
         
         externalNativeBuild {
             cmake {
                 // Maximal Error Catching & Fuzzing-ready Flags
                 // Shared flags: -Werror -Wall -Wextra -Wshadow -Wconversion -Wformat=2 -Wimplicit-fallthrough
-                // Sanitizers: -fsanitize=address,undefined -fno-omit-frame-pointer -fstack-protector-strong
+                // Sanitizers disabled for device compatibility: -fno-omit-frame-pointer -fstack-protector-strong
                 
-                cFlags   "-std=c23   -Werror -Wall -Wextra -Wshadow -Wconversion -Wformat=2 -Wimplicit-fallthrough -fsanitize=address,undefined -fno-omit-frame-pointer -fstack-protector-strong"
-                cppFlags "-std=c++23 -Werror -Wall -Wextra -Wshadow -Wconversion -Wformat=2 -Wimplicit-fallthrough -fsanitize=address,undefined -fno-omit-frame-pointer -fstack-protector-strong"
+                cFlags = nativeCFlags.split(' ')
+                cppFlags = nativeCppFlags.split(' ')
+                arguments(*nativeCmakeArgs)
                 
-                // Focus on arm64-v8a for this strict audit
-                abiFilters 'arm64-v8a'
+                // Supported binaries for now: ARM (32/64), Intel (64)
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
             }
         }
     }
 
     compileOptions {
-        coreLibraryDesugaringEnabled true
-        sourceCompatibility JavaVersion.VERSION_21
-        targetCompatibility JavaVersion.VERSION_21
+        coreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     java {
@@ -52,30 +94,26 @@ android {
     }
 
     buildFeatures {
-        compose true
-        buildConfig true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion '1.5.10'
+        compose = true
+        buildConfig = true
     }
 
     flavorDimensions += "variant"
 
     productFlavors {
         classik {
-            dimension "variant"
-            applicationIdSuffix ".classik"
-            versionNameSuffix "-classik"
+            dimension = "variant"
+            applicationIdSuffix = ".classik"
+            versionNameSuffix = "-classik"
             buildConfigField "int", "MIN_GRID_SIZE", "3"
             buildConfigField "int", "MAX_GRID_SIZE", "9"
             buildConfigField "boolean", "ML_ENABLED", "false"
             resValue "string", "app_name", "Keen Classik"
         }
         kenning {
-            dimension "variant"
-            applicationIdSuffix ".kenning"
-            versionNameSuffix "-kenning"
+            dimension = "variant"
+            applicationIdSuffix = ".kenning"
+            versionNameSuffix = "-kenning"
             buildConfigField "int", "MIN_GRID_SIZE", "3"
             buildConfigField "int", "MAX_GRID_SIZE", "16"
             buildConfigField "boolean", "ML_ENABLED", "true"
@@ -85,31 +123,45 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled = true
+            shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            ndk {
+                debugSymbolLevel = 'FULL'
+            }
+            externalNativeBuild {
+                cmake {
+                    // Optional sanitizer/trace flags controlled via Gradle properties
+                    cFlags = nativeDebugCFlags.split(' ')
+                    cppFlags = nativeDebugCppFlags.split(' ')
+                    arguments(*(nativeCmakeArgs + ["-DANDROID_STL=c++_shared"]))
+                }
+            }
+
         }
     }
 
     splits {
         abi {
-            enable true
+            enable = true
             reset()
-            include 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64', 'riscv64'
-            universalApk true
+            include 'armeabi-v7a', 'arm64-v8a', 'x86_64'
+            universalApk = true
         }
     }
 
     lint {
-        warningsAsErrors true
-        abortOnError true
-        checkReleaseBuilds true
+        warningsAsErrors = true
+        abortOnError = true
+        checkReleaseBuilds = true
         disable 'GradleDependency'
     }
 
     externalNativeBuild {
         cmake {
-            path "CMakeLists.txt"
+            path = "CMakeLists.txt"
         }
     }
     
@@ -123,23 +175,27 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 dependencies {
+    implementation project(':core')
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.2'
-    implementation platform('androidx.compose:compose-bom:2024.09.00')
+    implementation platform('androidx.compose:compose-bom:2025.12.01')
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
     implementation 'androidx.compose.ui:ui-tooling-preview'
     implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
     implementation 'androidx.activity:activity-compose:1.9.2'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.6'
+    implementation 'androidx.tracing:tracing:1.3.0'
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
+    debugImplementation 'androidx.benchmark:benchmark-junit4:1.4.1'
 
     constraints {
-        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22") {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.3.0") {
             because("kotlin-stdlib-jdk7 is now part of kotlin-stdlib")
         }
-        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22") {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.3.0") {
             because("kotlin-stdlib-jdk8 is now part of kotlin-stdlib")
         }
     }
@@ -151,9 +207,106 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.12.1'
     testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3'
-    androidTestImplementation 'androidx.test:runner:1.7.0'
-    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
-    // ONNX Runtime only included in kenning flavor (ML-enabled)
-    kenningImplementation 'com.microsoft.onnxruntime:onnxruntime-android:1.19.0'
+    androidTestImplementation platform('androidx.compose:compose-bom:2025.12.01')
+    androidTestImplementation 'androidx.compose.ui:ui-test'
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
+    androidTestImplementation 'androidx.benchmark:benchmark-junit4:1.4.1'
+    androidTestImplementation 'androidx.test:core:1.5.0'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test:monitor:1.6.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-intents:3.5.1'
+    // Kenning ML + narrative module (ML-enabled flavor only)
+    kenningImplementation project(':kenning')
+}
+
+def emulatorKeepaliveScript = rootProject.file("scripts/emulator_keepalive.sh")
+def emulatorLogcatScript = rootProject.file("scripts/emulator_logcat_capture.sh")
+def emulatorWaitScript = rootProject.file("scripts/perf/emulator_wait_ready.sh")
+def emulatorSerial = (project.findProperty("androidSerial") ?: System.getenv("ANDROID_SERIAL") ?: "").toString().trim()
+def adbSerialArg = emulatorSerial ? "-s ${emulatorSerial}" : ""
+def kenningReportDir = file("${buildDir}/reports/androidTests/connected/debug/flavors/kenning")
+def logcatSinceFile = new File(kenningReportDir, "logcat_since.txt")
+def execOps = project.services.get(org.gradle.process.ExecOperations)
+
+tasks.register("startEmulatorKeepalive") {
+    doLast {
+        if (!emulatorKeepaliveScript.exists()) {
+            logger.lifecycle("Emulator keepalive script not found: ${emulatorKeepaliveScript}")
+            return
+        }
+        execOps.exec {
+            commandLine "bash", emulatorKeepaliveScript.absolutePath, "start"
+            if (emulatorSerial) {
+                environment "ANDROID_SERIAL", emulatorSerial
+            }
+        }
+    }
+}
+
+tasks.register("waitForEmulatorReady") {
+    doLast {
+        if (!emulatorWaitScript.exists()) {
+            logger.lifecycle("Emulator wait script not found: ${emulatorWaitScript}")
+            return
+        }
+        execOps.exec {
+            def args = ["bash", emulatorWaitScript.absolutePath]
+            if (emulatorSerial) {
+                args.add(emulatorSerial)
+                environment "ANDROID_SERIAL", emulatorSerial
+            }
+            commandLine args
+        }
+    }
+}
+
+tasks.register("stopEmulatorKeepalive") {
+    doLast {
+        if (!emulatorKeepaliveScript.exists()) {
+            return
+        }
+        execOps.exec {
+            commandLine "bash", emulatorKeepaliveScript.absolutePath, "stop"
+            if (emulatorSerial) {
+                environment "ANDROID_SERIAL", emulatorSerial
+            }
+        }
+    }
+}
+
+tasks.register("clearEmulatorLogcat") {
+    doLast {
+        kenningReportDir.mkdirs()
+        execOps.exec {
+            commandLine "bash", "-lc", "adb ${adbSerialArg} logcat -c || true"
+        }
+        execOps.exec {
+            commandLine "bash", "-lc", "adb ${adbSerialArg} shell date '+%m-%d %H:%M:%S.000' 2>/dev/null > ${logcatSinceFile.absolutePath} || true"
+        }
+    }
+}
+
+tasks.register("captureKenningLogcat") {
+    doLast {
+        if (!emulatorLogcatScript.exists()) {
+            logger.lifecycle("Emulator logcat script not found: ${emulatorLogcatScript}")
+            return
+        }
+        kenningReportDir.mkdirs()
+        def outFile = new File(kenningReportDir, "logcat_disconnect.txt")
+        execOps.exec {
+            commandLine "bash", emulatorLogcatScript.absolutePath, outFile.absolutePath
+            environment "LOGCAT_SINCE_FILE", logcatSinceFile.absolutePath
+            if (emulatorSerial) {
+                environment "ANDROID_SERIAL", emulatorSerial
+            }
+        }
+    }
+}
+
+tasks.matching { it.name == "connectedKenningDebugAndroidTest" }.configureEach {
+    dependsOn("waitForEmulatorReady", "startEmulatorKeepalive", "clearEmulatorLogcat")
+    finalizedBy("captureKenningLogcat", "stopEmulatorKeepalive")
 }

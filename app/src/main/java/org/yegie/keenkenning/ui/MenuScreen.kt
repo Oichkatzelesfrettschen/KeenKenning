@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.yegie.keenkenning.data.GameMode
@@ -117,7 +118,8 @@ fun MenuScreen(
                 label = "Grid Size",
                 options = sizes.map { it.displayName },
                 selectedIndex = sizes.indexOfFirst { it.size == state.selectedSize }.coerceAtLeast(0),
-                onSelect = { index -> onSizeChange(sizes[index].size) }
+                onSelect = { index -> onSizeChange(sizes[index].size) },
+                testTag = "gridSizeSelector"
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -127,7 +129,8 @@ fun MenuScreen(
                 label = "Difficulty",
                 options = difficulties,
                 selectedIndex = state.selectedDifficulty,
-                onSelect = onDifficultyChange
+                onSelect = onDifficultyChange,
+                testTag = "difficultySelector"
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -216,12 +219,14 @@ fun GameModeSelector(
                 .fillMaxWidth()
                 .height(110.dp)  // ModeCard is 100.dp + scale animation allowance
         ) {
-            LazyRow(
-                state = listState,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(horizontal = 4.dp)
-            ) {
-                items(GameMode.entries.toList()) { mode ->
+            val availableModes = remember { GameMode.availableModes() }
+        LazyRow(
+            state = listState,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp),
+            modifier = Modifier.testTag("gameModeList")
+        ) {
+                items(availableModes) { mode ->
                     ModeCard(
                         mode = mode,
                         isSelected = mode == selectedMode,
@@ -457,7 +462,8 @@ fun SelectorRow(
     label: String,
     options: List<String>,
     selectedIndex: Int,
-    onSelect: (Int) -> Unit
+    onSelect: (Int) -> Unit,
+    testTag: String? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -476,7 +482,8 @@ fun SelectorRow(
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(0xFF2a2a4a))
                     .clickable { expanded = true }
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .let { base -> if (testTag != null) base.testTag(testTag) else base },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -498,7 +505,13 @@ fun SelectorRow(
                 modifier = Modifier.background(Color(0xFF2a2a4a))
             ) {
                 options.forEachIndexed { index, option ->
+                    val itemModifier = if (testTag != null) {
+                        Modifier.testTag("${testTag}Option_$index")
+                    } else {
+                        Modifier
+                    }
                     DropdownMenuItem(
+                        modifier = itemModifier,
                         text = {
                             Text(
                                 text = option,

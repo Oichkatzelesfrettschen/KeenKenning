@@ -18,18 +18,35 @@
 #include "puzzles.h" /* For smalloc, sfree */
 
 /* Maximum cage size - must match kenken.c */
-#define MAXBLK 6
+#define MAXBLK 16
 
 /* Operation codes - must match kenken.c */
-#define C_ADD 0x00000000L
-#define C_MUL 0x20000000L
-#define C_SUB 0x40000000L
-#define C_DIV 0x60000000L
-#define C_EXP 0x80000000L
-#define C_MOD 0xA0000000L
-#define C_GCD 0xC0000000L
-#define C_LCM 0xE0000000L
-#define CMASK 0xE0000000L
+
+#define C_ADD UINT64_C(0x00000000)
+
+#define C_MUL UINT64_C(0x20000000)
+
+#define C_SUB UINT64_C(0x40000000)
+
+#define C_DIV UINT64_C(0x60000000)
+
+#define C_EXP UINT64_C(0x80000000)
+
+#define C_MOD UINT64_C(0xA0000000)
+
+#define C_GCD UINT64_C(0xC0000000)
+
+#define C_LCM UINT64_C(0xE0000000)
+
+/* Extended bitwise operations */
+
+#define C_XOR UINT64_C(0x10000000)
+
+#define C_AND UINT64_C(0x30000000)
+
+#define C_OR  UINT64_C(0x50000000)
+
+#define CMASK UINT64_C(0xF0000000)
 
 /* Forward declaration for dsf_canonify from dsf.c */
 extern int dsf_canonify(int* dsf, int index);
@@ -135,13 +152,15 @@ static int collect_cage(const validate_ctx* ctx, int root, int* cells, digit* va
  * Returns 1 if satisfied, 0 if violated.
  */
 static int check_cage_constraint(const validate_ctx* ctx, int root, digit* values, int ncells) {
-    long clue = ctx->clues[root];
-    long target = clue & ~CMASK;
-    long op = clue & CMASK;
+    clue_t uclue = ctx->clues[root];
+    uint64_t target = uclue & ~CMASK;
+    uint64_t op = uclue & CMASK;
     int i;
 
-    /* Killer mode: check for duplicate digits in cage */
-    if (ctx->mode_flags & MODE_KILLER) {
+    /*
+     * Killer mode: reject if any digits are repeated in the cage
+     */
+    if (HAS_MODE(ctx->mode_flags, MODE_KILLER)) {
         int seen = 0;
         for (i = 0; i < ncells; i++) {
             int bit = 1 << values[i];
@@ -152,31 +171,32 @@ static int check_cage_constraint(const validate_ctx* ctx, int root, digit* value
 
     switch (op) {
         case C_ADD: {
-            long sum = 0;
-            for (i = 0; i < ncells; i++) sum += values[i];
+            uint64_t sum = 0;
+            for (i = 0; i < ncells; i++) sum += (uint64_t)values[i];
             return sum == target;
         }
 
         case C_MUL: {
-            long prod = 1;
-            for (i = 0; i < ncells; i++) prod *= values[i];
+            uint64_t prod = 1;
+            for (i = 0; i < ncells; i++) prod *= (uint64_t)values[i];
             return prod == target;
         }
 
         case C_SUB: {
-            /* 2-cell only: |a - b| = target */
+            /* 2-cell only: |a-b| = target */
             if (ncells != 2) return 0;
-            long diff = values[0] - values[1];
-            if (diff < 0) diff = -diff;
-            return diff == target;
+            uint64_t diff = values[0] > values[1] ? 
+                            (uint64_t)values[0] - (uint64_t)values[1] :
+                            (uint64_t)values[1] - (uint64_t)values[0];
+            return target == diff;
         }
 
         case C_DIV: {
             /* 2-cell only: max/min = target (exact division) */
             if (ncells != 2) return 0;
-            long a = values[0], b = values[1];
+            uint64_t a = (uint64_t)values[0], b = (uint64_t)values[1];
             if (a < b) {
-                long t = a;
+                uint64_t t = a;
                 a = b;
                 b = t;
             }
@@ -187,34 +207,48 @@ static int check_cage_constraint(const validate_ctx* ctx, int root, digit* value
         case C_EXP: {
             /* 2-cell only: a^b = target or b^a = target */
             if (ncells != 2) return 0;
-            long a = values[0], b = values[1];
-            long pow_ab = 1, pow_ba = 1;
-            for (i = 0; i < b && pow_ab <= target; i++) pow_ab *= a;
-            for (i = 0; i < a && pow_ba <= target; i++) pow_ba *= b;
-            return (pow_ab == target) || (pow_ba == target);
+            uint64_t a = (uint64_t)values[0], b = (uint64_t)values[1];
+            uint64_t pow_ab = 1, pow_ba = 1;
+            for (i = 0; i < (int)b && pow_ab <= target; i++) pow_ab *= a;
+            for (i = 0; i < (int)a && pow_ba <= target; i++) pow_ba *= b;
+            return pow_ab == target || pow_ba == target;
         }
 
         case C_MOD: {
-            /* 2-cell only: a % b = target or b % a = target */
+            /* 2-cell only: larger % smaller = target */
             if (ncells != 2) return 0;
-            long a = values[0], b = values[1];
-            if (a == 0 && b == 0) return target == 0;
-            return (b != 0 && a % b == target) || (a != 0 && b % a == target);
+            uint64_t a = (uint64_t)values[0], b = (uint64_t)values[1];
+            if (a < b) {
+                uint64_t t = a;
+                a = b;
+                b = t;
+            }
+            if (b == 0) return 0;
+            return (a % b) == target;
         }
 
         case C_GCD: {
-            long g = values[0];
-            for (i = 1; i < ncells; i++) g = gcd(g, values[i]);
-            return g == target;
+            /* GCD of all digits = target */
+            long g = (long)values[0];
+            for (i = 1; i < ncells; i++) g = gcd(g, (long)values[i]);
+            return (uint64_t)g == target;
         }
 
         case C_LCM: {
-            long l = values[0];
+            /* LCM of all digits = target */
+            long l = (long)values[0];
             for (i = 1; i < ncells; i++) {
-                l = lcm(l, values[i]);
+                l = lcm(l, (long)values[i]);
                 if (l > 10000000) return 0; /* Overflow protection */
             }
-            return l == target;
+            return (uint64_t)l == target;
+        }
+
+        case C_XOR: {
+            /* XOR of all digits = target */
+            uint64_t x = (uint64_t)values[0];
+            for (i = 1; i < ncells; i++) x ^= (uint64_t)values[i];
+            return x == target;
         }
 
         default:

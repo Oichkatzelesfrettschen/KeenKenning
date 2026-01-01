@@ -345,7 +345,7 @@ static int add234_insert(node234* left, void* e, node234* right, node234** root,
  */
 static void* add234_internal(tree234* t, void* e, int index) {
     node234* n;
-    int ki;
+    int ki = 0;
     void* orig_e = e;
     int c;
 
@@ -856,7 +856,7 @@ static void trans234_subtree_merge(node234* n, int ki, int* k, int* index) {
 static void* delpos234_internal(tree234* t, int index) {
     node234* n;
     void* retval;
-    int ki, i;
+    int ki = 0, i;
 
     retval = nullptr;
 

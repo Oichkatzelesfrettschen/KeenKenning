@@ -45,7 +45,7 @@ typedef struct {
     int w;           /* Grid width/height */
     digit* grid;     /* Current cell values (0 = empty) */
     int* dsf;        /* Disjoint set forest for cage membership */
-    long* clues;     /* Cage clues with operation in upper bits */
+    clue_t* clues;     /* Cage clues with operation in upper bits */
     int mode_flags;  /* Mode flags (e.g., MODE_KILLER) */
     digit* solution; /* Known solution (for verification) */
 } hint_ctx;

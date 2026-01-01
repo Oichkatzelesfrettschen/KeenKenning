@@ -30,6 +30,7 @@
  */
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stdarg.h>
 #include <string.h>
 
@@ -342,10 +343,12 @@ int latin_solver_set(struct latin_solver* solver, struct latin_solver_scratch* s
          */
         i = n;
         while (i > 0 && set[i - 1]) set[--i] = 0, count--;
-        if (i > 0)
-            set[--i] = 1, count++;
-        else
+        if (i > 0) {
+            set[i - 1] = 1;
+            count++;
+        } else {
             break; /* done */
+        }
     }
 
     return 0;
@@ -1034,7 +1037,7 @@ void latin_solver_debug(unsigned char* cube, int o) {
             dbg[c++] = '\n';
         }
         dbg[c++] = '\n';
-        dbg[c++] = '\0';
+        dbg[c] = '\0';
 
         printf("%s", dbg);
         sfree(dbg);

@@ -25,6 +25,7 @@ import org.yegie.keenkenning.data.PuzzleResult
 import org.yegie.keenkenning.data.SaveManager
 import org.yegie.keenkenning.data.SaveSlotInfo
 import org.yegie.keenkenning.data.StoryChapter
+import org.yegie.keenkenning.FlavorServices
 import org.yegie.keenkenning.data.StoryManager
 import org.yegie.keenkenning.data.UserStatsManager
 
@@ -57,7 +58,7 @@ class GameViewModel : ViewModel() {
             statsManager = UserStatsManager(context.applicationContext)
         }
         if (storyManager == null) {
-            storyManager = StoryManager(context.applicationContext)
+            storyManager = FlavorServices.storyManager(context.applicationContext)
         }
     }
 

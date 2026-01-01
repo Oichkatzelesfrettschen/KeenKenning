@@ -1122,7 +1122,7 @@ private fun AccessibleCellView(
                 tonalElevation = 1.dp
             ) {
                 Text(
-                    text = cell.clue!!,
+                    text = cell.clue.orEmpty(),
                     fontSize = clueTextSize,
                     fontWeight = FontWeight.Bold,
                     color = colors.textPrimary,
