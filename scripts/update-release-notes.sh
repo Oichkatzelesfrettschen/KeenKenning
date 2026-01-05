@@ -15,6 +15,13 @@ if ! command -v gh &> /dev/null; then
     exit 1
 fi
 
+# Check if authenticated with GitHub
+if ! gh auth status &> /dev/null; then
+    echo "Error: Not authenticated with GitHub"
+    echo "Run: gh auth login"
+    exit 1
+fi
+
 # Check if notes file exists
 if [ ! -f "$NOTES_FILE" ]; then
     echo "Error: Release notes file not found: $NOTES_FILE"

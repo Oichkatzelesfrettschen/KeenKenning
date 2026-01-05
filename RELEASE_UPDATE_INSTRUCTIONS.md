@@ -19,11 +19,17 @@ Created new user-focused release notes that:
 
 ### Option 1: Using the Script (Recommended)
 
-If you have the GitHub CLI (`gh`) installed:
+If you have the GitHub CLI (`gh`) installed and authenticated:
 
 ```bash
 ./scripts/update-release-notes.sh
 ```
+
+The script is already executable and will:
+- Check that `gh` CLI is installed
+- Verify you're authenticated with GitHub (run `gh auth login` if not)
+- Check that the release notes file exists
+- Update the release on GitHub
 
 This will automatically update the release notes on GitHub.
 
