@@ -37,7 +37,7 @@ An automated script that:
 ### Quick Start (Recommended)
 ```bash
 # Navigate to the repository root
-cd /home/runner/work/KeenKenning/KeenKenning
+cd /path/to/your/KeenKenning
 
 # Ensure you're authenticated with GitHub
 gh auth login
